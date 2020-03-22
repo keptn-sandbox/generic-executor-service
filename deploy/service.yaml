@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: generic-executor-service
+  namespace: keptn
+spec:
+  selector:
+    matchLabels:
+      run: generic-executor-service
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        run: generic-executor-service
+    spec:
+      containers:
+      - name: generic-executor-service
+        image: keptn/generic-executor-service:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: EVENTBROKER
+          value: 'http://event-broker.keptn.svc.cluster.local/keptn'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: generic-executor-service
+  namespace: keptn
+  labels:
+    run: generic-executor-service
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+  selector:
+    run: generic-executor-service
