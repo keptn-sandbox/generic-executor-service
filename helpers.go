@@ -26,6 +26,31 @@ import (
 )
 
 /**
+ * Structs
+ */
+
+type baseKeptnEvent struct {
+	context string
+	source  string
+	event   string
+
+	project      string
+	stage        string
+	service      string
+	deployment   string
+	testStrategy string
+
+	labels map[string]string
+}
+
+type genericHttpRequest struct {
+	method  string
+	uri     string
+	headers map[string]string
+	body    string
+}
+
+/**
  * Helper Functions
  */
 func getConfigurationServiceURL() string {
@@ -38,16 +63,16 @@ func getConfigurationServiceURL() string {
 /**
  * Retrieves a resource (=file) from the keptn configuration repo and stores it in the local file system
  */
-func getKeptnResource(project, stage, service, resource string, logger *keptnutils.Logger) (string, error) {
+func getKeptnResource(keptnEvent baseKeptnEvent, resource string, logger *keptnutils.Logger) (string, error) {
 
 	// if we run in a runlocal mode we are just getting the file from the local disk
 	if runlocal {
-		return _getKeptnResourceFromLocal(project, stage, service, resource, logger)
+		return _getKeptnResourceFromLocal(keptnEvent, resource, logger)
 	}
 
 	// get it from keptn
 	resourceHandler := configutils.NewResourceHandler(getConfigurationServiceURL())
-	requestedResource, err := resourceHandler.GetServiceResource(project, stage, service, resource)
+	requestedResource, err := resourceHandler.GetServiceResource(keptnEvent.project, keptnEvent.stage, keptnEvent.service, resource)
 
 	// return Nil in case resource couldnt be retrieved
 	if err != nil || requestedResource.ResourceContent == "" {
@@ -87,7 +112,7 @@ func getKeptnResource(project, stage, service, resource string, logger *keptnuti
 /**
  * Retrieves a resource (=file) from the local file system. Basically checks if the file is available and if so returns it
  */
-func _getKeptnResourceFromLocal(project, stage, service, resource string, logger *keptnutils.Logger) (string, error) {
+func _getKeptnResourceFromLocal(keptnEvent baseKeptnEvent, resource string, logger *keptnutils.Logger) (string, error) {
 	if _, err := os.Stat(resource); err == nil {
 		return resource, nil
 	} else {
@@ -115,24 +140,28 @@ func getKeptnDomain() (string, error) {
 
 //
 // replaces $ placeholders with actual values
+// $CONTEXT, $EVENT, $SOURCE
 // $PROJECT, $STAGE, $SERVICE, $DEPLOYMENT
 // $TESTSTRATEGY
 // $LABEL.XXXX  -> will replace that with a label called XXXX
 // $ENV.XXXX    -> will replace that with an env variable called XXXX
 // $SECRET.YYYY -> will replace that with the k8s secret called YYYY
 //
-func replaceKeptnPlaceholders(input string, project, stage, service, deployment, teststrategy string, labels map[string]string) string {
+func replaceKeptnPlaceholders(input string, keptnEvent baseKeptnEvent) string {
 	result := input
 
 	// first we do the regular keptn values
-	result = strings.Replace(result, "$PROJECT", project, -1)
-	result = strings.Replace(result, "$STAGE", stage, -1)
-	result = strings.Replace(result, "$SERVICE", service, -1)
-	result = strings.Replace(result, "$DEPLOYMENT", deployment, -1)
-	result = strings.Replace(result, "$TESTSTRATEGY", teststrategy, -1)
+	result = strings.Replace(result, "$CONTEXT", keptnEvent.context, -1)
+	result = strings.Replace(result, "$EVENT", keptnEvent.event, -1)
+	result = strings.Replace(result, "$SOURCE", keptnEvent.source, -1)
+	result = strings.Replace(result, "$PROJECT", keptnEvent.project, -1)
+	result = strings.Replace(result, "$STAGE", keptnEvent.stage, -1)
+	result = strings.Replace(result, "$SERVICE", keptnEvent.service, -1)
+	result = strings.Replace(result, "$DEPLOYMENT", keptnEvent.deployment, -1)
+	result = strings.Replace(result, "$TESTSTRATEGY", keptnEvent.testStrategy, -1)
 
 	// now we do the labels
-	for key, value := range labels {
+	for key, value := range keptnEvent.labels {
 		result = strings.Replace(result, "$LABEL."+key, value, -1)
 	}
 
@@ -178,17 +207,10 @@ func _nextCleanLine(lines []string, lineIx int, trim bool) (int, string) {
 	return lineIx, line
 }
 
-type genericHttpRequest struct {
-	method  string
-	uri     string
-	headers map[string]string
-	body    string
-}
-
 //
 // Parses .http raw file content and returns HTTP METHOD, URI, HEADERS, BODY
 //
-func parseHttpRequestFromHttpTextFile(httpfile string) (genericHttpRequest, error) {
+func parseHttpRequestFromHttpTextFile(keptnEvent baseKeptnEvent, httpfile string) (genericHttpRequest, error) {
 	var returnRequest genericHttpRequest
 
 	content, err := ioutil.ReadFile(httpfile)
@@ -196,14 +218,17 @@ func parseHttpRequestFromHttpTextFile(httpfile string) (genericHttpRequest, erro
 		return returnRequest, err
 	}
 
-	return parseHttpRequestFromString(string(content))
+	return parseHttpRequestFromString(string(content), keptnEvent)
 }
 
 //
 // Parses .http string content and returns HTTP METHOD, URI, HEADERS, BODY
 //
-func parseHttpRequestFromString(rawContent string) (genericHttpRequest, error) {
+func parseHttpRequestFromString(rawContent string, keptnEvent baseKeptnEvent) (genericHttpRequest, error) {
 	var returnRequest genericHttpRequest
+
+	// lets first replace all Keptn related placeholders
+	rawContent = replaceKeptnPlaceholders(rawContent, keptnEvent)
 
 	// lets get each line
 	lines := strings.Split(rawContent, "\n")
@@ -307,7 +332,7 @@ func executeCommand(command string, args []string, logger *keptnutils.Logger) (b
 // Sends a ConfigurationChangeEventType = "sh.keptn.event.configuration.change"
 //
 func sendConfigurationChangeEvent(shkeptncontext string, incomingEvent *cloudevents.Event, project, service, stage string, labels map[string]string, logger *keptnutils.Logger) error {
-	source, _ := url.Parse("jenkins-service")
+	source, _ := url.Parse("generic-executer-service")
 	contentType := "application/json"
 
 	configurationChangeData := keptnevents.ConfigurationChangeEventData{}

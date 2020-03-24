@@ -17,3 +17,4 @@ vendor/*
 #binary - go build
 generic-executor-service
 main
+_forAndi.sh

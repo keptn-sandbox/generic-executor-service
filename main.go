@@ -19,6 +19,7 @@ import (
 )
 
 const eventbroker = "EVENTBROKER"
+
 var runlocal = (os.Getenv("env") == "runlocal")
 
 type envConfig struct {
@@ -35,94 +36,124 @@ func processKeptnCloudEvent(ctx context.Context, event cloudevents.Event) error 
 	var shkeptncontext string
 	event.Context.ExtensionAs("shkeptncontext", &shkeptncontext)
 
-	logger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "jenkins-service")
+	// create a base Keptn Event
+	keptnEvent := baseKeptnEvent{
+		event:   event.Type(),
+		source:  event.Source(),
+		context: shkeptncontext,
+	}
 
+	logger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "jenkins-service")
 	logger.Info(fmt.Sprintf("gotEvent(%s): %s - %s", event.Type(), shkeptncontext, event.Context.GetID()))
 
 	// ********************************************
 	// Lets test on each possible Event Type and call the respective handler function
 	// ********************************************
-	if event.Type() == keptnevents.ConfigurationChangeEventType  {
-		logger.Info("Got Configuration Change Event");
+	if keptnEvent.event == keptnevents.ConfigurationChangeEventType {
+		logger.Info("Got Configuration Change Event")
 
-		configChangeEventData := &keptnevents.ConfigurationChangeEventData {}
-		err := event.DataAs(configChangeEventData)
+		data := &keptnevents.ConfigurationChangeEventData{}
+		err := event.DataAs(data)
 		if err != nil {
 			logger.Error(fmt.Sprintf("Got Data Error: %s", err.Error()))
-			return err	
+			return err
 		} else {
-			return handleConfigurationChangeEvent(event, shkeptncontext, configChangeEventData, logger);
+			keptnEvent.project = data.Project
+			keptnEvent.stage = data.Stage
+			keptnEvent.service = data.Service
+			keptnEvent.labels = data.Labels
+			return handleConfigurationChangeEvent(event, keptnEvent, data, logger)
 		}
 		return nil
 	}
-	if event.Type() == keptnevents.DeploymentFinishedEventType {
-		logger.Info("Got Deployment Finished Event");
+	if keptnEvent.event == keptnevents.DeploymentFinishedEventType {
+		logger.Info("Got Deployment Finished Event")
 
-		deployFinishEventData := &keptnevents.DeploymentFinishedEventData{}
-		err := event.DataAs(deployFinishEventData)
+		data := &keptnevents.DeploymentFinishedEventData{}
+		err := event.DataAs(data)
 		if err != nil {
 			logger.Error(fmt.Sprintf("Got Data Error: %s", err.Error()))
-			return err	
+			return err
 		} else {
-			return handleDeploymentFinishedEvent(event, shkeptncontext, deployFinishEventData, logger);
+			keptnEvent.project = data.Project
+			keptnEvent.stage = data.Stage
+			keptnEvent.service = data.Service
+			keptnEvent.labels = data.Labels
+			return handleDeploymentFinishedEvent(event, keptnEvent, data, logger)
 		}
 		return nil
 	}
-	if event.Type() == keptnevents.TestsFinishedEventType 	{
-		logger.Info("Got Tests Finished Change Event");
+	if keptnEvent.event == keptnevents.TestsFinishedEventType {
+		logger.Info("Got Tests Finished Change Event")
 
-		testsFinishedEventData := &keptnevents.TestsFinishedEventData {}
-		err := event.DataAs(testsFinishedEventData)
+		data := &keptnevents.TestsFinishedEventData{}
+		err := event.DataAs(data)
 		if err != nil {
 			logger.Error(fmt.Sprintf("Got Data Error: %s", err.Error()))
-			return err	
+			return err
 		} else {
-			return handleTestsFinishedEvent(event, shkeptncontext, testsFinishedEventData, logger);
+			keptnEvent.project = data.Project
+			keptnEvent.stage = data.Stage
+			keptnEvent.service = data.Service
+			keptnEvent.labels = data.Labels
+			return handleTestsFinishedEvent(event, keptnEvent, data, logger)
 		}
 		return nil
 	}
-	if event.Type() == keptnevents.StartEvaluationEventType 	{
-		logger.Info("Got Start Evaluation Event");
+	if keptnEvent.event == keptnevents.StartEvaluationEventType {
+		logger.Info("Got Start Evaluation Event")
 
-		startEvaluationEventData := &keptnevents.StartEvaluationEventData {}
-		err := event.DataAs(startEvaluationEventData)
+		data := &keptnevents.StartEvaluationEventData{}
+		err := event.DataAs(data)
 		if err != nil {
 			logger.Error(fmt.Sprintf("Got Data Error: %s", err.Error()))
-			return err	
+			return err
 		} else {
-			return handleStartEvaluationEvent(event, shkeptncontext, startEvaluationEventData, logger);
+			keptnEvent.project = data.Project
+			keptnEvent.stage = data.Stage
+			keptnEvent.service = data.Service
+			keptnEvent.labels = data.Labels
+			return handleStartEvaluationEvent(event, keptnEvent, data, logger)
 		}
 		return nil
-	}	
-	if event.Type() == keptnevents.EvaluationDoneEventType 	{
-		logger.Info("Got Evaluation Done Event");
+	}
+	if keptnEvent.event == keptnevents.EvaluationDoneEventType {
+		logger.Info("Got Evaluation Done Event")
 
-		evaluationDoneEventData := &keptnevents.EvaluationDoneEventData {}
-		err := event.DataAs(evaluationDoneEventData)
+		data := &keptnevents.EvaluationDoneEventData{}
+		err := event.DataAs(data)
 		if err != nil {
 			logger.Error(fmt.Sprintf("Got Data Error: %s", err.Error()))
-			return err	
+			return err
 		} else {
-			return handleEvaluationDoneEvent(event, shkeptncontext, evaluationDoneEventData, logger);
+			keptnEvent.project = data.Project
+			keptnEvent.stage = data.Stage
+			keptnEvent.service = data.Service
+			keptnEvent.labels = data.Labels
+			return handleEvaluationDoneEvent(event, keptnEvent, data, logger)
 		}
 		return nil
-	}		
-	if event.Type() == keptnevents.ProblemOpenEventType || event.Type() == keptnevents.ProblemEventType {
-		logger.Info("Got Problem Event");
+	}
+	if keptnEvent.event == keptnevents.ProblemOpenEventType || keptnEvent.event == keptnevents.ProblemEventType {
+		logger.Info("Got Problem Event")
 
-		problemEventData := &keptnevents.ProblemEventData {}
-		err := event.DataAs(problemEventData)
+		data := &keptnevents.ProblemEventData{}
+		err := event.DataAs(data)
 		if err != nil {
 			logger.Error(fmt.Sprintf("Got Data Error: %s", err.Error()))
-			return err	
+			return err
 		} else {
-			return handleProblemEvent(event, shkeptncontext, problemEventData, logger);
+			keptnEvent.project = data.Project
+			keptnEvent.stage = data.Stage
+			keptnEvent.service = data.Service
+			keptnEvent.labels = data.Labels
+			return handleProblemEvent(event, keptnEvent, data, logger)
 		}
 		return nil
-	}		
+	}
 
 	// Unkonwn Keptn Event -> Throw Error!
-	var errorMsg string 
+	var errorMsg string
 	errorMsg = fmt.Sprintf("Received unexpected keptn event: %s", event.Type())
 	logger.Error(errorMsg)
 	return errors.New(errorMsg)
@@ -144,19 +175,23 @@ func main() {
 		log.Fatalf("Failed to process env var: %s", err)
 	}
 
-	if(runlocal) {
+	if runlocal {
 		log.Println("env=runlocal: Running with local filesystem to fetch resources")
+		log.Println("Also setting the env variable TESTTOKEN for testing purposes")
+
+		// set some test env variables
+		os.Setenv("TESTTOKEN", "MYTESTTOKENVALUE")
 	}
 
 	// if we get called with a test parameter we just execute the requested test
-	if(len(os.Args) > 1 && (os.Args[1] == "test")) {
-		os.Exit(_mainTests(os.Args[1:], env));
+	if len(os.Args) > 1 && (os.Args[1] == "test") {
+		os.Exit(_mainTests(os.Args[1:], env))
 	} else {
 		os.Exit(_main(os.Args[1:], env))
 	}
 }
 
-/** 
+/**
  * Opens up a listener on localhost:port/path and passes incoming requets to gotEvent
  */
 func _main(args []string, env envConfig) int {
@@ -188,7 +223,7 @@ func _main(args []string, env envConfig) int {
  *
  */
 func _mainTests(args []string, env envConfig) int {
-	log.Println(fmt.Sprintf("Running Tests for %s", args));
+	log.Println(fmt.Sprintf("Running Tests for %s", args))
 
 	// Set Env-Variable Eventbroker to localhost:port/path so we can call our local running app
 	os.Setenv(eventbroker, fmt.Sprintf("http://localhost:%d%s", env.Port, env.Path))
@@ -198,44 +233,47 @@ func _mainTests(args []string, env envConfig) int {
 		testType = args[1]
 	}
 
-	labels := map[string]string { 
-		"gitcommit": "abcde123141241", 
-		"author": "andi", 
-		"link": "https://keptn.sh",
+	// set some test labels
+	labels := map[string]string{
+		"gitcommit": "abcde123141241",
+		"author":    "andi",
+		"link":      "https://keptn.sh",
 	}
 
-	var err error = nil;
-	if (testType == "*") || (testType == keptnevents.ConfigurationChangeEventType)  {
-		log.Println("Execute Configuration Change Test");
-		err = sendConfigurationChangeEvent("", nil, "project", "service", "stage", labels, nil)
+	shkeptncontext := "11112222-3333-4444-5555-123456789012"
+
+	var err error = nil
+	if (testType == "*") || (testType == keptnevents.ConfigurationChangeEventType) {
+		log.Println("Execute Configuration Change Test")
+		err = sendConfigurationChangeEvent(shkeptncontext, nil, "project", "service", "stage", labels, nil)
 	}
 	if (testType == "*") || (testType == keptnevents.DeploymentFinishedEventType) {
-		log.Println("Execute Deployment Finished Test");
-		err = sendDeploymentFinishedEvent("", nil, "project", "service", "stage", "performance", "direct", "serviceimage", "2.0.0", "http://service.stage.svc.local", "https://service.stage.yourkeptndomain.com", labels, nil)
+		log.Println("Execute Deployment Finished Test")
+		err = sendDeploymentFinishedEvent(shkeptncontext, nil, "project", "service", "stage", "performance", "direct", "serviceimage", "2.0.0", "http://service.stage.svc.local", "https://service.stage.yourkeptndomain.com", labels, nil)
 	}
 	if (testType == "*") || (testType == keptnevents.TestsFinishedEventType) {
-		log.Println("Execute Tests Finished Change Test");
-		err = sendTestsFinishedEvent("", nil, "project", "service", "stage", "performance", "direct", time.Now(), time.Now(), "results", labels, nil)
+		log.Println("Execute Tests Finished Change Test")
+		err = sendTestsFinishedEvent(shkeptncontext, nil, "project", "service", "stage", "performance", "direct", time.Now(), time.Now(), "results", labels, nil)
 	}
-/*	if (testType == "*") || (testType == keptnevents.StartEvaluationEventType) {
-		log.Println("Execute Start Evaluation Test");
+	/*	if (testType == "*") || (testType == keptnevents.StartEvaluationEventType) {
+			log.Println("Execute Start Evaluation Test");
 
-		startEvaluationEventData := &keptnevents.StartEvaluationEventData {}
-	}	
-	if (testType == "*") || (testType == keptnevents.EvaluationDoneEventType) {
-		log.Println("Execute Evaluation Done Test");
+			startEvaluationEventData := &keptnevents.StartEvaluationEventData {}
+		}
+		if (testType == "*") || (testType == keptnevents.EvaluationDoneEventType) {
+			log.Println("Execute Evaluation Done Test");
 
-		evaluationDoneEventData := &keptnevents.EvaluationDoneEventData {}
-	}		
-	if (testType == "*") || (testType == keptnevents.EvaluationDoneEventType) {
-		log.Println("Execute Problem Test");
+			evaluationDoneEventData := &keptnevents.EvaluationDoneEventData {}
+		}
+		if (testType == "*") || (testType == keptnevents.EvaluationDoneEventType) {
+			log.Println("Execute Problem Test");
 
-		problemEventData := &keptnevents.ProblemEventData {}
-	}*/
+			problemEventData := &keptnevents.ProblemEventData {}
+		}*/
 
-	if (err != nil) {
-		log.Println(fmt.Sprintf("Error: %s", err.Error()));
+	if err != nil {
+		log.Println(fmt.Sprintf("Error: %s", err.Error()))
 	}
 
-	return 0;
+	return 0
 }

@@ -19,12 +19,11 @@ import (
   -> "sh.keptn.event.problem.open"
   -> "sh.keptn.events.problem"
 */
-
 //
 // if the passed files exist either executes the bash or the http request
 //
-func executeScriptOrHTTP(data *keptnevents.ConfigurationChangeEventData, logger *keptnutils.Logger, bashFilename, httpFilename string) (bool, error) {
-	resource, err := getKeptnResource(data.Project, data.Service, data.Stage, bashFilename, logger)
+func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, bashFilename, httpFilename string) (bool, error) {
+	resource, err := getKeptnResource(keptnEvent, bashFilename, logger)
 	if resource != "" && err == nil {
 		logger.Info("Found script " + bashFilename)
 		_, err = executeCommand(resource, nil, logger)
@@ -36,10 +35,10 @@ func executeScriptOrHTTP(data *keptnevents.ConfigurationChangeEventData, logger 
 	}
 
 	var parsedRequest genericHttpRequest
-	resource, err = getKeptnResource(data.Project, data.Service, data.Stage, httpFilename, logger)
+	resource, err = getKeptnResource(keptnEvent, httpFilename, logger)
 	if resource != "" && err == nil {
 		logger.Info("Found http request " + httpFilename)
-		parsedRequest, err = parseHttpRequestFromHttpTextFile(httpFilename)
+		parsedRequest, err = parseHttpRequestFromHttpTextFile(keptnEvent, httpFilename)
 		if err == nil {
 			statusCode, body, requestError := executeGenericHttpRequest(parsedRequest)
 			if requestError != nil {
@@ -62,10 +61,10 @@ func executeScriptOrHTTP(data *keptnevents.ConfigurationChangeEventData, logger 
 // Handles ConfigurationChangeEventType = "sh.keptn.event.configuration.change"
 // TODO: add in your handler code
 //
-func handleConfigurationChangeEvent(event cloudevents.Event, shkeptncontext string, data *keptnevents.ConfigurationChangeEventData, logger *keptnutils.Logger) error {
+func handleConfigurationChangeEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.ConfigurationChangeEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Configuration Changed Event: %s", event.Context.GetID()))
 
-	_, err := executeScriptOrHTTP(data, logger, "./scripts/configuration.change.sh", "./scripts/configuration.change.http")
+	_, err := executeScriptOrHTTP(keptnEvent, logger, "./scripts/configuration.change.sh", "./scripts/configuration.change.http")
 	if err != nil {
 		logger.Error(fmt.Sprintf("Error: %s", err.Error()))
 	}
@@ -77,7 +76,7 @@ func handleConfigurationChangeEvent(event cloudevents.Event, shkeptncontext stri
 // Handles DeploymentFinishedEventType = "sh.keptn.events.deployment-finished"
 // TODO: add in your handler code
 //
-func handleDeploymentFinishedEvent(event cloudevents.Event, shkeptncontext string, data *keptnevents.DeploymentFinishedEventData, logger *keptnutils.Logger) error {
+func handleDeploymentFinishedEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.DeploymentFinishedEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Deployment Finished Event: %s", event.Context.GetID()))
 
 	return nil
@@ -87,7 +86,7 @@ func handleDeploymentFinishedEvent(event cloudevents.Event, shkeptncontext strin
 // Handles TestsFinishedEventType = "sh.keptn.events.tests-finished"
 // TODO: add in your handler code
 //
-func handleTestsFinishedEvent(event cloudevents.Event, shkeptncontext string, data *keptnevents.TestsFinishedEventData, logger *keptnutils.Logger) error {
+func handleTestsFinishedEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.TestsFinishedEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Tests Finished Event: %s", event.Context.GetID()))
 
 	return nil
@@ -97,7 +96,7 @@ func handleTestsFinishedEvent(event cloudevents.Event, shkeptncontext string, da
 // Handles EvaluationDoneEventType = "sh.keptn.events.evaluation-done"
 // TODO: add in your handler code
 //
-func handleStartEvaluationEvent(event cloudevents.Event, shkeptncontext string, data *keptnevents.StartEvaluationEventData, logger *keptnutils.Logger) error {
+func handleStartEvaluationEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.StartEvaluationEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Start Evaluation Event: %s", event.Context.GetID()))
 
 	return nil
@@ -107,7 +106,7 @@ func handleStartEvaluationEvent(event cloudevents.Event, shkeptncontext string, 
 // Handles DeploymentFinishedEventType = "sh.keptn.events.deployment-finished"
 // TODO: add in your handler code
 //
-func handleEvaluationDoneEvent(event cloudevents.Event, shkeptncontext string, data *keptnevents.EvaluationDoneEventData, logger *keptnutils.Logger) error {
+func handleEvaluationDoneEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.EvaluationDoneEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Evaluation Done Event: %s", event.Context.GetID()))
 
 	return nil
@@ -118,7 +117,7 @@ func handleEvaluationDoneEvent(event cloudevents.Event, shkeptncontext string, d
 // Handles ProblemEventType = "sh.keptn.events.problem"
 // TODO: add in your handler code
 //
-func handleProblemEvent(event cloudevents.Event, shkeptncontext string, data *keptnevents.ProblemEventData, logger *keptnutils.Logger) error {
+func handleProblemEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.ProblemEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Problem Event: %s", event.Context.GetID()))
 
 	return nil
