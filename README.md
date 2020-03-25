@@ -72,7 +72,7 @@ If you want to build this service yourself here is what you need to do
 * Build the docker image: `docker build . -t your-username/generic-executor-service:dev` (Note: Replace `your-username` with your DockerHub account/organization)
 * Push the docker image to DockerHub: `docker push your-username/generic-executor-service:dev` (Note: Replace `your-username` with your DockerHub account/organization)
 * Deploy the service using `kubectl`: `kubectl apply -f deploy/` (Note: Update the image reference in the service.yaml to point to your docker image on DockerHub)
-* Undeploy the service using `kubectl`: `kubectl deploy -f deploy/`
+* Undeploy the service using `kubectl`: `kubectl apply -f deploy/`
 * Watch the deployment using `kubectl`: `kubectl -n keptn get deployment generic-executor-service -o wide`
 * Get logs using `kubectl`: `kubectl -n keptn logs deployment/generic-executor-service -f`
 * Watch the deployed pods using `kubectl`: `kubectl -n keptn get pods -l run=generic-executor-service`

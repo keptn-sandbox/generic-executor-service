@@ -4,9 +4,9 @@
 FROM golang:1.12.13-alpine as builder
 ARG version=develop
 
-WORKDIR /go/src/github.com/keptn/keptn/generic-executor-service
+WORKDIR /src/generic-executor-service
 
-# Force the go compiler to use modules 
+# Force the go compiler to use modules
 ENV GO111MODULE=on
 ENV BUILDFLAGS=""
 ENV GOPROXY=https://proxy.golang.org
@@ -32,21 +32,21 @@ COPY . .
 # (You may fetch or manage dependencies here, either manually or with a tool like "godep".)
 RUN GOOS=linux go build -ldflags '-linkmode=external' $BUILDFLAGS -v -o generic-executor-service
 
+# Use a Docker multi-stage build to create a lean production image.
+# https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
+FROM alpine:3.11
+ENV ENV=production
+
 # Install extra packages
 # See https://github.com/gliderlabs/docker-alpine/issues/136#issuecomment-272703023
-# Change TimeZone TODO: TZ still is not set!
-ARG TZ="Europe/Amsterdam"
-RUN    apk update \
-	&& apk upgrade \
+
+RUN    apk update && apk upgrade \
 	&& apk add ca-certificates libc6-compat \
 	&& update-ca-certificates \
-	&& apk add --update openjdk8-jre tzdata curl unzip bash \
-	&& apk add --no-cache nss \
-	&& rm -rf /var/cache/apk/* \
-	&& mkdir -p /tmp/dependencies
+	&& rm -rf /var/cache/apk/*
 
 # Copy the binary to the production image from the builder stage.
-COPY --from=builder /go/src/github.com/keptn/keptn/generic-executor-service/generic-executor-service /generic-executor-service
+COPY --from=builder /src/generic-executor-service/generic-executor-service /generic-executor-service
 
 EXPOSE 8080
 

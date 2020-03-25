@@ -52,7 +52,7 @@
         protocol: TCP
     selector:
       run: generic-executor-service
-  ---
+---
   ## Subscribe to events via a keptn/distributor
   apiVersion: apps/v1
   kind: Deployment
