@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	"github.com/cloudevents/sdk-go/pkg/cloudevents/client"
@@ -183,12 +182,7 @@ func main() {
 		os.Setenv("TESTTOKEN", "MYTESTTOKENVALUE")
 	}
 
-	// if we get called with a test parameter we just execute the requested test
-	if len(os.Args) > 1 && (os.Args[1] == "test") {
-		os.Exit(_mainTests(os.Args[1:], env))
-	} else {
-		os.Exit(_main(os.Args[1:], env))
-	}
+	os.Exit(_main(os.Args[1:], env))
 }
 
 /**
@@ -215,65 +209,6 @@ func _main(args []string, env envConfig) int {
 	}
 
 	log.Fatalf("failed to start receiver: %s", c.StartReceiver(ctx, processKeptnCloudEvent))
-
-	return 0
-}
-
-/**
- *
- */
-func _mainTests(args []string, env envConfig) int {
-	log.Println(fmt.Sprintf("Running Tests for %s", args))
-
-	// Set Env-Variable Eventbroker to localhost:port/path so we can call our local running app
-	os.Setenv(eventbroker, fmt.Sprintf("http://localhost:%d%s", env.Port, env.Path))
-
-	var testType = "*"
-	if len(args) > 1 {
-		testType = args[1]
-	}
-
-	// set some test labels
-	labels := map[string]string{
-		"gitcommit": "abcde123141241",
-		"author":    "andi",
-		"link":      "https://keptn.sh",
-	}
-
-	shkeptncontext := "11112222-3333-4444-5555-123456789012"
-
-	var err error = nil
-	if (testType == "*") || (testType == keptnevents.ConfigurationChangeEventType) {
-		log.Println("Execute Configuration Change Test")
-		err = sendConfigurationChangeEvent(shkeptncontext, nil, "project", "service", "stage", labels, nil)
-	}
-	if (testType == "*") || (testType == keptnevents.DeploymentFinishedEventType) {
-		log.Println("Execute Deployment Finished Test")
-		err = sendDeploymentFinishedEvent(shkeptncontext, nil, "project", "service", "stage", "performance", "direct", "serviceimage", "2.0.0", "http://service.stage.svc.local", "https://service.stage.yourkeptndomain.com", labels, nil)
-	}
-	if (testType == "*") || (testType == keptnevents.TestsFinishedEventType) {
-		log.Println("Execute Tests Finished Change Test")
-		err = sendTestsFinishedEvent(shkeptncontext, nil, "project", "service", "stage", "performance", "direct", time.Now(), time.Now(), "results", labels, nil)
-	}
-	/*	if (testType == "*") || (testType == keptnevents.StartEvaluationEventType) {
-			log.Println("Execute Start Evaluation Test");
-
-			startEvaluationEventData := &keptnevents.StartEvaluationEventData {}
-		}
-		if (testType == "*") || (testType == keptnevents.EvaluationDoneEventType) {
-			log.Println("Execute Evaluation Done Test");
-
-			evaluationDoneEventData := &keptnevents.EvaluationDoneEventData {}
-		}
-		if (testType == "*") || (testType == keptnevents.EvaluationDoneEventType) {
-			log.Println("Execute Problem Test");
-
-			problemEventData := &keptnevents.ProblemEventData {}
-		}*/
-
-	if err != nil {
-		log.Println(fmt.Sprintf("Error: %s", err.Error()))
-	}
 
 	return 0
 }

@@ -23,44 +23,76 @@ const GenericScriptFolderBase = "./generic-executor/"
   -> "sh.keptn.events.problem"
 */
 //
-// if the passed files exist either executes the bash or the http request
+// if any of the passed files exist either executes the bash or the http request
 //
-func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, bashFilename, httpFilename string) (bool, error) {
-	resource, err := getKeptnResource(keptnEvent, bashFilename, logger)
-	if resource != "" && err == nil {
-		logger.Info("Found script " + bashFilename)
-		var output string
-		output, err = executeCommandWithKeptnContext(resource, nil, keptnEvent, nil, logger)
-		if err != nil {
-			return false, err
-		} else {
-			logger.Info("Script output: " + output)
-		}
-	} else {
-		logger.Info("No script found at " + bashFilename)
-	}
+func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, bashFilenames, httpFilenames []string) (bool, error) {
 
-	var parsedRequest genericHttpRequest
-	resource, err = getKeptnResource(keptnEvent, httpFilename, logger)
-	if resource != "" && err == nil {
-		logger.Info("Found http request " + httpFilename)
-		parsedRequest, err = parseHttpRequestFromHttpTextFile(keptnEvent, httpFilename)
-		if err == nil {
-			statusCode, body, requestError := executeGenericHttpRequest(parsedRequest)
-			if requestError != nil {
-				logger.Error(fmt.Sprintf("Error: %s", err.Error()))
+	// lets start with the bashfiles
+	for _, bashFilename := range bashFilenames {
+		resource, err := getKeptnResource(keptnEvent, bashFilename, logger)
+		if resource != "" && err == nil {
+			logger.Debug("Found script " + bashFilename)
+			var output string
+			output, err = executeCommandWithKeptnContext(resource, nil, keptnEvent, nil, logger)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Error executing script: %s", err.Error()))
 				return false, err
 			} else {
-				logger.Info(fmt.Sprintf("%d - %s", statusCode, body))
+				logger.Info("Script output: " + output)
 			}
 		} else {
-			return false, err
+			logger.Debug("No script found at " + bashFilename)
 		}
-	} else {
-		logger.Info("No http found at " + httpFilename)
+	}
+
+	// now we iterate through the http files
+	for _, httpFilename := range httpFilenames {
+		var parsedRequest genericHttpRequest
+		resource, err := getKeptnResource(keptnEvent, httpFilename, logger)
+		if resource != "" && err == nil {
+			logger.Debug("Found http request " + httpFilename)
+			parsedRequest, err = parseHttpRequestFromHttpTextFile(keptnEvent, httpFilename)
+			if err == nil {
+				statusCode, body, requestError := executeGenericHttpRequest(parsedRequest)
+				if requestError != nil {
+					logger.Error(fmt.Sprintf("Error: %s", err.Error()))
+					return false, err
+				} else {
+					logger.Info(fmt.Sprintf("%d - %s", statusCode, body))
+				}
+			} else {
+				return false, err
+			}
+		} else {
+			logger.Debug("No http file found at " + httpFilename)
+		}
 	}
 
 	return true, nil
+}
+
+//
+// Handles an incoming event
+//
+func _executeScriptOrHttEventHandler(event cloudevents.Event, keptnEvent baseKeptnEvent, data interface{}, filePrefix string, logger *keptnutils.Logger) error {
+	// we allow different files to be specified by the end user
+	bashFilenames := []string{
+		GenericScriptFolderBase + "all.events.sh",
+		GenericScriptFolderBase + filePrefix + ".sh",
+	}
+
+	httpFilenames := []string{
+		GenericScriptFolderBase + "all.events.http",
+		GenericScriptFolderBase + filePrefix + ".http",
+	}
+
+	// now lets execute these scripts!
+	_, err := executeScriptOrHTTP(keptnEvent, logger, bashFilenames, httpFilenames)
+	if err != nil {
+		logger.Error(fmt.Sprintf("Error: %s", err.Error()))
+	}
+
+	return err
 }
 
 //
@@ -70,12 +102,7 @@ func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, b
 func handleConfigurationChangeEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.ConfigurationChangeEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Configuration Changed Event: %s", event.Context.GetID()))
 
-	_, err := executeScriptOrHTTP(keptnEvent, logger, GenericScriptFolderBase+"configuration.change.sh", GenericScriptFolderBase+"configuration.change.http")
-	if err != nil {
-		logger.Error(fmt.Sprintf("Error: %s", err.Error()))
-	}
-
-	return err
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "configuration.change", logger)
 }
 
 //
@@ -85,7 +112,7 @@ func handleConfigurationChangeEvent(event cloudevents.Event, keptnEvent baseKept
 func handleDeploymentFinishedEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.DeploymentFinishedEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Deployment Finished Event: %s", event.Context.GetID()))
 
-	return nil
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "deployment.finished", logger)
 }
 
 //
@@ -95,27 +122,27 @@ func handleDeploymentFinishedEvent(event cloudevents.Event, keptnEvent baseKeptn
 func handleTestsFinishedEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.TestsFinishedEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Tests Finished Event: %s", event.Context.GetID()))
 
-	return nil
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "tests.finished", logger)
 }
 
 //
-// Handles EvaluationDoneEventType = "sh.keptn.events.evaluation-done"
+// Handles EvaluationDoneEventType = "sh.keptn.events.start-evaluation"
 // TODO: add in your handler code
 //
 func handleStartEvaluationEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.StartEvaluationEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Start Evaluation Event: %s", event.Context.GetID()))
 
-	return nil
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "start.evaluation", logger)
 }
 
 //
-// Handles DeploymentFinishedEventType = "sh.keptn.events.deployment-finished"
+// Handles DeploymentFinishedEventType = "sh.keptn.events.evaluation-done"
 // TODO: add in your handler code
 //
 func handleEvaluationDoneEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.EvaluationDoneEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Evaluation Done Event: %s", event.Context.GetID()))
 
-	return nil
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "evaluation.done", logger)
 }
 
 //
@@ -124,7 +151,7 @@ func handleEvaluationDoneEvent(event cloudevents.Event, keptnEvent baseKeptnEven
 // TODO: add in your handler code
 //
 func handleProblemEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.ProblemEventData, logger *keptnutils.Logger) error {
-	logger.Info(fmt.Sprintf("Handling Problem Event: %s", event.Context.GetID()))
+	logger.Info(fmt.Sprintf("Handling Problem Open Event: %s", event.Context.GetID()))
 
-	return nil
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "problem.open", logger)
 }

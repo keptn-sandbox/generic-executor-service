@@ -1,37 +1,92 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: generic-executor-service
-  namespace: keptn
-spec:
-  selector:
-    matchLabels:
-      run: generic-executor-service
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        run: generic-executor-service
-    spec:
-      containers:
-      - name: generic-executor-service
-        image: keptn/generic-executor-service:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: EVENTBROKER
-          value: 'http://event-broker.keptn.svc.cluster.local/keptn'
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: generic-executor-service
-  namespace: keptn
-  labels:
-    run: generic-executor-service
-spec:
-  ports:
-  - port: 8080
-    protocol: TCP
-  selector:
-    run: generic-executor-service
+  # Deployment of our keptn-service-template-go
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: generic-executor-service
+    namespace: keptn
+  spec:
+    selector:
+      matchLabels:
+        run: generic-executor-service
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          run: generic-executor-service
+      spec:
+        containers:
+          - name: generic-executor-service
+            image: grabnerandi/generic-executor-service:latest # Todo: Replace this with your image name
+            ports:
+              - containerPort: 8080
+            env:
+              - name: EVENTBROKER
+                value: 'http://event-broker.keptn.svc.cluster.local/keptn'
+              - name: CONFIGURATION_SERVICE
+                value: 'http://configuration-service.keptn.svc.cluster.local:8080'
+              - name: YOURCUSTOMENV
+                value: YOURCUSTOMVALUE
+              - name: DT_API_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: dynatrace
+                    key: DT_API_TOKEN
+              - name: DT_TENANT
+                valueFrom:
+                  secretKeyRef:
+                    name: dynatrace
+                    key: DT_TENANT
+---
+  # Expose generic-executor-service via Port 8080 within the cluster
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: generic-executor-service
+    namespace: keptn
+    labels:
+      run: generic-executor-service
+  spec:
+    ports:
+      - port: 8080
+        protocol: TCP
+    selector:
+      run: generic-executor-service
+  ---
+  ## Subscribe to events via a keptn/distributor
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: generic-executor-service-distributor
+    namespace: keptn
+  spec:
+    selector:
+      matchLabels:
+        run: distributor
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          run: distributor
+      spec:
+        containers:
+          - name: distributor
+            image: keptn/distributor:0.6.1
+            ports:
+              - containerPort: 8080
+            resources:
+              requests:
+                memory: "32Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "500m"
+            env:
+              - name: PUBSUB_URL
+                value: 'nats://keptn-nats-cluster'
+              # listen to all events in sh.keptn. - see https://github.com/keptn/spec/blob/0.1.3/cloudevents.md
+              - name: PUBSUB_TOPIC
+                value: 'sh.keptn.>'
+              - name: PUBSUB_RECIPIENT
+                value: 'generic-executor-service'
+  

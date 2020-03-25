@@ -291,7 +291,6 @@ func executeGenericHttpRequest(request genericHttpRequest) (int, string, error) 
 	req, err := http.NewRequest(request.method, request.uri, bytes.NewBufferString(request.body))
 
 	if err != nil {
-		log.Println(err.Error())
 		return -1, "", err
 	}
 
@@ -303,7 +302,6 @@ func executeGenericHttpRequest(request genericHttpRequest) (int, string, error) 
 	// execute
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println(err.Error())
 		return -1, "", err
 	}
 
@@ -367,11 +365,8 @@ func executeCommand(command string, args []string, envs []string, directory *str
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("Error executing command %s %s: %s\n%s", command, strings.Join(args, " "), err.Error(), string(out))
-		logger.Error(err.Error())
 		return "", err
 	}
-
-	logger.Debug("Successfull executed command: " + command + "\nOutput: " + string(out))
 
 	return string(out), nil
 }
