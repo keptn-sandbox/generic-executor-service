@@ -62,16 +62,42 @@ The *generic-executor-service* by default handles all Keptn events and then sear
 
 The *generic-executor-service* will first execute those files with the name all.events.sh and all.events.http. This gives you the ability to specify one set of action that should be executed for every Keptn event.
 After that the *generic-executor-service* will look for a file called KEPTN-EVENT.sh or KEPTN-EVENT.http where KEPTN-EVENT can be one of the following values corresponding to the Keptn events
+```
 -- configuration.change.*
 -- deployment.finished.*
 -- tests.finished.*
 -- start.evaluation.*
 -- evaluation.done.*
 -- problem.open.*
+```
 
 This gives you full flexiblity to provide a bash and http script for each event or specify a bash and http script that shoudl be executed for all events.
 
 Please have a look at the sample .http and .sh files to see how the *generic-executor-service* is not only calling these scripts or making http calls. The service is also passing Keptn Event specific context data such as PROJECT, SERVICE, LABELS and also ENV-Variables of the *generic-executor-service* pod as variables that you can reference. This gives you a lot of flexibility when writing these scripts.
+
+Here a sample http script that shows you how to call an external webhook with this capability.
+The *generic-executor-service* will replace the core Keptn Event values as well as provides each label via $LABEL.LABELNAME and each Environment Variable via $ENV.ENVNAME
+```
+POST https://webhook.site/YOURHOOKID
+Accept: application/json
+Cache-Control: no-cache
+Content-Type: application/cloudevents+json
+
+{
+  "contenttype": "application/json",
+  "deploymentstrategy": "blue_green_service",
+  "project": "$PROJECT",
+  "service": "$SERVICE",
+  "stage": "$STAGE",
+  "mylabel" : "$LABEL.gitcommit",
+  "mytoken" : "$ENV.TESTTOKEN",
+  "shkeptncontext": "$CONTEXT",
+  "event": "$EVENT",
+  "source": "$SOURCE"
+}
+```
+
+Enjoy the fun!
 
 ## Development
 
