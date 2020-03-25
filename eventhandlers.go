@@ -10,7 +10,7 @@ import (
 )
 
 // GenericScriptFolderBase Folder in the Keptn GitHub Repo where we expect scripts and http files
-const GenericScriptFolderBase = "./generic-executor/"
+const GenericScriptFolderBase = "generic-executor/"
 
 /**
 * Here are all the handler functions for the individual events
@@ -27,6 +27,8 @@ const GenericScriptFolderBase = "./generic-executor/"
 //
 func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, bashFilenames, httpFilenames []string) (bool, error) {
 
+	success := true
+
 	// lets start with the bashfiles
 	for _, bashFilename := range bashFilenames {
 		resource, err := getKeptnResource(keptnEvent, bashFilename, logger)
@@ -36,7 +38,7 @@ func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, b
 			output, err = executeCommandWithKeptnContext(resource, nil, keptnEvent, nil, logger)
 			if err != nil {
 				logger.Error(fmt.Sprintf("Error executing script: %s", err.Error()))
-				return false, err
+				success = false
 			} else {
 				logger.Info("Script output: " + output)
 			}
@@ -56,19 +58,20 @@ func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, b
 				statusCode, body, requestError := executeGenericHttpRequest(parsedRequest)
 				if requestError != nil {
 					logger.Error(fmt.Sprintf("Error: %s", err.Error()))
-					return false, err
+					success = false
 				} else {
 					logger.Info(fmt.Sprintf("%d - %s", statusCode, body))
 				}
 			} else {
-				return false, err
+				logger.Error(fmt.Sprintf("Error: %s", err.Error()))
+				success = false
 			}
 		} else {
 			logger.Debug("No http file found at " + httpFilename)
 		}
 	}
 
-	return true, nil
+	return success, nil
 }
 
 //

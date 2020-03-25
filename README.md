@@ -49,6 +49,30 @@ To delete a deployed *generic-executor-service*, use the file `deploy/*.yaml` fi
 kubectl delete -f deploy/service.yaml
 ```
 
+## Usage
+
+The purpose of the *generic-executor-service" is to allow users to provide either .sh (shell scripts) or .http (HTTP Request) files that will be executed when Keptn sends different events, e.g: you want to execute a specific script when a deployment-finished event is sent.
+The *generic-executor-service* by default handles all Keptn events and then searches for either .sh or .http files in the stage & service specific Keptn Git repo in the subfolder *generic-executor*. Here is a sample folder structure in my Git repo for a specific service and stage:
+```
+/MYSERVICE/genericexecutor
+-- all.events.sh
+-- configuration.change.sh
+-- configuration.change.http
+```
+
+The *generic-executor-service* will first execute those files with the name all.events.sh and all.events.http. This gives you the ability to specify one set of action that should be executed for every Keptn event.
+After that the *generic-executor-service* will look for a file called KEPTN-EVENT.sh or KEPTN-EVENT.http where KEPTN-EVENT can be one of the following values corresponding to the Keptn events
+-- configuration.change.*
+-- deployment.finished.*
+-- tests.finished.*
+-- start.evaluation.*
+-- evaluation.done.*
+-- problem.open.*
+
+This gives you full flexiblity to provide a bash and http script for each event or specify a bash and http script that shoudl be executed for all events.
+
+Please have a look at the sample .http and .sh files to see how the *generic-executor-service* is not only calling these scripts or making http calls. The service is also passing Keptn Event specific context data such as PROJECT, SERVICE, LABELS and also ENV-Variables of the *generic-executor-service* pod as variables that you can reference. This gives you a lot of flexibility when writing these scripts.
+
 ## Development
 
 Be my guest and help me extend this Generic Executor Service for Keptn with new capabilities. 

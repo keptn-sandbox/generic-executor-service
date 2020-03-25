@@ -55,10 +55,13 @@ type genericHttpRequest struct {
  * Helper Functions
  */
 func getConfigurationServiceURL() string {
-	if os.Getenv("env") == "production" {
-		return "configuration-service:8080"
+	configurationServiceURL := "configuration-service:8080"
+	if runlocal {
+		configurationServiceURL = "localhost:8080"
 	}
-	return "localhost:8080"
+
+	log.Println("getConfigurationUrl:", configurationServiceURL)
+	return configurationServiceURL
 }
 
 /**
@@ -77,7 +80,7 @@ func getKeptnResource(keptnEvent baseKeptnEvent, resource string, logger *keptnu
 
 	// return Nil in case resource couldnt be retrieved
 	if err != nil || requestedResource.ResourceContent == "" {
-		logger.Debug(fmt.Sprintf("Keptn Resource not found: %s - %s", resource, err))
+		logger.Debug(fmt.Sprintf("Keptn Resource not found: %s/%s/%s/%s - %s", keptnEvent.project, keptnEvent.stage, keptnEvent.service, resource, err))
 		return "", err
 	}
 
@@ -105,6 +108,11 @@ func getKeptnResource(keptnEvent baseKeptnEvent, resource string, logger *keptnu
 	if err != nil {
 		logger.Error(err.Error())
 		return "", err
+	}
+
+	// if the downloaded file is a shell script we also change the permissions
+	if strings.HasSuffix(resource, ".sh") {
+		os.Chmod(resource, 0777)
 	}
 
 	return resource, nil

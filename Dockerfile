@@ -41,6 +41,7 @@ ENV ENV=production
 # See https://github.com/gliderlabs/docker-alpine/issues/136#issuecomment-272703023
 
 RUN    apk update && apk upgrade \
+    && apk add bash \
 	&& apk add ca-certificates libc6-compat \
 	&& update-ca-certificates \
 	&& rm -rf /var/cache/apk/*
