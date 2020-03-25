@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -243,6 +244,7 @@ func parseHttpRequestFromString(rawContent string, keptnEvent baseKeptnEvent) (g
 	lineSplits := strings.Split(line, " ")
 	if len(lineSplits) == 1 {
 		// only provides URI
+		returnRequest.method = "GET"
 		returnRequest.uri = lineSplits[0]
 	} else {
 		// provides method and URI
@@ -311,21 +313,67 @@ func executeGenericHttpRequest(request genericHttpRequest) (int, string, error) 
 	return resp.StatusCode, string(body), err
 }
 
-//
-// Executes a command, e.g: ls -l; ./yourscript.sh
-//
-func executeCommand(command string, args []string, logger *keptnutils.Logger) (bool, error) {
-	res, err := keptnutils.ExecuteCommand(command, args)
+func executeCommandWithKeptnContext(command string, args []string, keptnEvent baseKeptnEvent, directory *string, logger *keptnutils.Logger) (string, error) {
+	// build the map of environment variables
 
-	logger.Info(res)
-	if err != nil {
-		logger.Error(err.Error())
-		return false, err
+	// first we build our core keptn values
+	keptnEnvs := []string{
+		"CONTEXT=" + keptnEvent.context,
+		"EVENT=" + keptnEvent.event,
+		"SOURCE=" + keptnEvent.source,
+		"PROJECT=" + keptnEvent.project,
+		"SERVICE=" + keptnEvent.service,
+		"STAGE=" + keptnEvent.stage,
+		"DEPLOYMENT=" + keptnEvent.deployment,
+		"TESTSTRATEGY" + keptnEvent.testStrategy,
 	}
 
-	logger.Debug("Successfull executed command: " + command)
+	// we combine the environment variables of our running process with all those with labels
+	// those from our local process are prefixed with ENV_ , e.g: ENV_processenv=abcd
+	// those coming from labels are prefixed with LABEL_, e.g: LABEL_mylabel=abcd
+	localEnvs := os.Environ()
+	commandEnvs := make([]string, len(keptnEnvs)+len(localEnvs)+len(keptnEvent.labels))
+	var envIx = 0
+	for _, env := range keptnEnvs {
+		commandEnvs[envIx] = env
+		envIx++
+	}
+	for _, env := range localEnvs {
+		commandEnvs[envIx] = "ENV_" + env
+		envIx++
+	}
+	for key, value := range keptnEvent.labels {
+		commandEnvs[envIx] = "LABEL_" + key + "=" + value
+		envIx++
+	}
 
-	return true, nil
+	return executeCommand(command, args, commandEnvs, directory, logger)
+}
+
+//
+// Executes a command, e.g: ls -l; ./yourscript.sh
+// Also sets the enviornment variables passed
+//
+func executeCommand(command string, args []string, envs []string, directory *string, logger *keptnutils.Logger) (string, error) {
+	cmd := exec.Command(command, args...)
+	if directory != nil {
+		cmd.Dir = *directory
+	}
+
+	// pass environment variables
+	cmd.Env = envs
+
+	// Execute Command
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("Error executing command %s %s: %s\n%s", command, strings.Join(args, " "), err.Error(), string(out))
+		logger.Error(err.Error())
+		return "", err
+	}
+
+	logger.Debug("Successfull executed command: " + command + "\nOutput: " + string(out))
+
+	return string(out), nil
 }
 
 //

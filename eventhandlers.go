@@ -9,6 +9,9 @@ import (
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 )
 
+// GenericScriptFolderBase Folder in the Keptn GitHub Repo where we expect scripts and http files
+const GenericScriptFolderBase = "./generic-executor/"
+
 /**
 * Here are all the handler functions for the individual events
   -> "sh.keptn.event.configuration.change"
@@ -26,9 +29,12 @@ func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, b
 	resource, err := getKeptnResource(keptnEvent, bashFilename, logger)
 	if resource != "" && err == nil {
 		logger.Info("Found script " + bashFilename)
-		_, err = executeCommand(resource, nil, logger)
+		var output string
+		output, err = executeCommandWithKeptnContext(resource, nil, keptnEvent, nil, logger)
 		if err != nil {
 			return false, err
+		} else {
+			logger.Info("Script output: " + output)
 		}
 	} else {
 		logger.Info("No script found at " + bashFilename)
@@ -64,7 +70,7 @@ func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, b
 func handleConfigurationChangeEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.ConfigurationChangeEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Configuration Changed Event: %s", event.Context.GetID()))
 
-	_, err := executeScriptOrHTTP(keptnEvent, logger, "./scripts/configuration.change.sh", "./scripts/configuration.change.http")
+	_, err := executeScriptOrHTTP(keptnEvent, logger, GenericScriptFolderBase+"configuration.change.sh", GenericScriptFolderBase+"configuration.change.http")
 	if err != nil {
 		logger.Error(fmt.Sprintf("Error: %s", err.Error()))
 	}

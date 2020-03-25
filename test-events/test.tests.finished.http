@@ -1,0 +1,25 @@
+##
+POST http://localhost:8080/
+Content-Type: application/cloudevents+json
+
+{
+  "contenttype": "application/json",
+  "data": {
+    "project": "simpleproject",
+    "service": "simplenode",
+    "stage": "staging",
+    "result": "pass",
+    "labels": {
+        "gitcommit" : "commit-ABCDEF123123",
+        "jenkinsjob" : "job1234",
+        "user" : "andi"
+    }
+  },
+  "id": "52fc82f5-892b-4888-a660-497c9262bb4a",
+  "source": "jmeter-service",
+  "specversion": "0.2",
+  "time": "2020-03-24T08:42:09.633Z",
+  "type": "sh.keptn.events.tests-finished",
+  "shkeptncontext": "664d2ad3-e925-4049-a7ff-39b8e584e5b5"
+}
+###
