@@ -16,11 +16,12 @@ export DT_API_TOKEN=YOURAPITOKEN
 export DT_TENANT=YOURTENANTURL
 ./createDynatraceKeptnCustomMetrics.sh
 ```
+You can run this script multiple times. Even if the custom metrics have already been created it will just update them or create them if not exist!
 
 Now you can use send.dynatrace.metric.http which will automatically send custom metric values to Dynatrace for each event.
 In Dynatrace you will see a new custom Device called Keptn. If you want to give your Keptn a more specific name you can change that in the send.dynatrace.metric.http by changing DisplayName to e.g: "My Keptn Installation on ABC"
 
-To get all events I suggest to add it as an all.events.http - like this:
+To get all events across all services and stages for your project I suggest to add it as an all.events.http for your project - like this:
 ```
-keptn add-resource --project=PROJECTNAME --stage=STAGE --service=SERVICENAME --resource=./send.dynatrace.metric.sh --resourceUri=generic-executor/all.events.http
+keptn add-resource --project=PROJECTNAME --resource=./send.dynatrace.metric.http --resourceUri=generic-executor/all.events.http
 ``` 

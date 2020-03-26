@@ -29,6 +29,11 @@
                 value: YOURCUSTOMVALUE
               - name: KEPTN_ENDPOINT
                 value: 'http://api.keptn.svc.cluster.local'
+              - name: KEPTN_DOMAIN
+                valueFrom:
+                  configMapKeyRef:
+                    name: keptn-domain
+                    key: app_domain
               - name: KEPTN_API_TOKEN
                 valueFrom:
                   secretKeyRef:

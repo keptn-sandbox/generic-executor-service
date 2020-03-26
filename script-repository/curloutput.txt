@@ -1,0 +1,1 @@
+{"timeseriesId":"custom:keptn.events.problem.open","displayName":"Keptn Problem Open Events","dimensions":["CUSTOM_DEVICE","project","stage","service"],"unit":"Count (count)","detailedSource":"API","types":["Event"],"aggregationTypes":["AVG","SUM","MIN","MAX"],"filter":"CUSTOM"}

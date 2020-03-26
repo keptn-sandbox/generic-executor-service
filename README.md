@@ -122,7 +122,7 @@ echo "TestToken = $ENV_TESTTOKEN"
 Last but not least - here are all the available placeholders for .http files and env-variables that are passed to your .sh files:
 ```
 // Event Context
-$CONTEXT,$EVENT,$SOURCE
+$CONTEXT,$EVENT,$SOURCE,$TIMESTRING,$TIMEUTC,$TIMEUTCMS
 
 // Project Context
 $PROJECT,$STAGE,$SERVICE,$DEPLOYMENT,$TESTSTRATEGY

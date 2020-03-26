@@ -83,14 +83,29 @@ func getKeptnResource(keptnEvent baseKeptnEvent, resource string, logger *keptnu
 		return _getKeptnResourceFromLocal(keptnEvent, resource, logger)
 	}
 
-	// get it from keptn
+	// get it from keptn - start on the service level - if not there - search on stage or then on project level
 	resourceHandler := configutils.NewResourceHandler(getConfigurationServiceURL())
-	requestedResource, err := resourceHandler.GetServiceResource(keptnEvent.project, keptnEvent.stage, keptnEvent.service, resource)
 
-	// return Nil in case resource couldnt be retrieved
+	// SERVICE-LEVEL: lets try to find it on service level
+	requestedResource, err := resourceHandler.GetServiceResource(keptnEvent.project, keptnEvent.stage, keptnEvent.service, resource)
 	if err != nil || requestedResource.ResourceContent == "" {
-		logger.Debug(fmt.Sprintf("Keptn Resource not found: %s/%s/%s/%s - %s", keptnEvent.project, keptnEvent.stage, keptnEvent.service, resource, err))
-		return "", err
+		// STAGE-LEVEL: not found on service level - lets search one level up on stage level
+		requestedResource, err = resourceHandler.GetStageResource(keptnEvent.project, keptnEvent.stage, resource)
+		if err != nil || requestedResource.ResourceContent == "" {
+			// PROJECT-LEVEL: not found on the stage level - lets search one level up on project level
+			requestedResource, err = resourceHandler.GetProjectResource(keptnEvent.project, resource)
+
+			if err != nil || requestedResource.ResourceContent == "" {
+				logger.Debug(fmt.Sprintf("Keptn Resource not found: %s/%s/%s/%s - %s", keptnEvent.project, keptnEvent.stage, keptnEvent.service, resource, err))
+				return "", err
+			}
+
+			logger.Debug("Found " + resource + " on project level")
+		} else {
+			logger.Debug("Found " + resource + " on stage level")
+		}
+	} else {
+		logger.Debug("Found " + resource + " on service level")
 	}
 
 	// now store that file on the same directory structure locally
@@ -158,7 +173,7 @@ func getKeptnDomain() (string, error) {
 
 //
 // replaces $ placeholders with actual values
-// $TIME, $TIMEUTC, $TIMEUTCMS
+// $TIMESTRING, $TIMEUTC, $TIMEUTCMS
 // $CONTEXT, $EVENT, $SOURCE
 // $PROJECT, $STAGE, $SERVICE
 // $DEPLOYMENT, $TESTSTRATEGY
@@ -171,7 +186,7 @@ func replaceKeptnPlaceholders(input string, keptnEvent baseKeptnEvent) string {
 	result := input
 
 	// first we do the regular keptn values
-	result = strings.Replace(result, "$TIME", keptnEvent.time, -1)
+	result = strings.Replace(result, "$TIMESTRING", keptnEvent.time, -1)
 	result = strings.Replace(result, "$TIMEUTC", keptnEvent.timeutc, -1)
 	result = strings.Replace(result, "$TIMEUTCMS", keptnEvent.timeutcms, -1)
 
@@ -343,7 +358,7 @@ func executeCommandWithKeptnContext(command string, args []string, keptnEvent ba
 
 	// first we build our core keptn values
 	keptnEnvs := []string{
-		"TIME=" + keptnEvent.time,
+		"TIMESTRING=" + keptnEvent.time,
 		"TIMEUTC=" + keptnEvent.timeutc,
 		"TIMEUTCMS=" + keptnEvent.timeutcms,
 		"CONTEXT=" + keptnEvent.context,

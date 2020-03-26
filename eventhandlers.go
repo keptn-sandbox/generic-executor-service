@@ -57,7 +57,7 @@ func executeScriptOrHTTP(keptnEvent baseKeptnEvent, logger *keptnutils.Logger, b
 			if err == nil {
 				statusCode, body, requestError := executeGenericHttpRequest(parsedRequest)
 				if requestError != nil {
-					logger.Error(fmt.Sprintf("Error: %s", err.Error()))
+					logger.Error(fmt.Sprintf("Error: %s", requestError.Error()))
 					success = false
 				} else {
 					logger.Info(fmt.Sprintf("%d - %s", statusCode, body))
@@ -117,7 +117,7 @@ func handleDeploymentFinishedEvent(event cloudevents.Event, keptnEvent baseKeptn
 	logger.Info(fmt.Sprintf("Handling Deployment Finished Event: %s", event.Context.GetID()))
 	keptnEvent.event = "deployment.finished"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent.event, logger)
 }
 
 //
@@ -128,7 +128,7 @@ func handleTestsFinishedEvent(event cloudevents.Event, keptnEvent baseKeptnEvent
 	logger.Info(fmt.Sprintf("Handling Tests Finished Event: %s", event.Context.GetID()))
 	keptnEvent.event = "tests.finished"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent.event, logger)
 }
 
 //
@@ -139,7 +139,7 @@ func handleStartEvaluationEvent(event cloudevents.Event, keptnEvent baseKeptnEve
 	logger.Info(fmt.Sprintf("Handling Start Evaluation Event: %s", event.Context.GetID()))
 	keptnEvent.event = "start.evaluation"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent.event, logger)
 }
 
 //
@@ -150,7 +150,7 @@ func handleEvaluationDoneEvent(event cloudevents.Event, keptnEvent baseKeptnEven
 	logger.Info(fmt.Sprintf("Handling Evaluation Done Event: %s", event.Context.GetID()))
 	keptnEvent.event = "evaluation.done"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent.event, logger)
 }
 
 //
@@ -162,5 +162,5 @@ func handleProblemEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data
 	logger.Info(fmt.Sprintf("Handling Problem Open Event: %s", event.Context.GetID()))
 	keptnEvent.event = "problem.open"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent.event, logger)
 }
