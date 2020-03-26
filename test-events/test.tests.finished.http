@@ -18,7 +18,7 @@ Content-Type: application/cloudevents+json
   "id": "52fc82f5-892b-4888-a660-497c9262bb4a",
   "source": "jmeter-service",
   "specversion": "0.2",
-  "time": "2020-03-24T08:42:09.633Z",
+  "time": "2020-03-26T20:16:09.633Z",
   "type": "sh.keptn.events.tests-finished",
   "shkeptncontext": "664d2ad3-e925-4049-a7ff-39b8e584e5b5"
 }

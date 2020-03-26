@@ -69,7 +69,6 @@ func getConfigurationServiceURL() string {
 		configurationServiceURL = "localhost:8080"
 	}
 
-	log.Println("getConfigurationUrl:", configurationServiceURL)
 	return configurationServiceURL
 }
 
@@ -173,7 +172,7 @@ func getKeptnDomain() (string, error) {
 
 //
 // replaces $ placeholders with actual values
-// $TIMESTRING, $TIMEUTC, $TIMEUTCMS
+// $TIMESTRING, $TIMEUTCSTRING, $TIMEUTCMS
 // $CONTEXT, $EVENT, $SOURCE
 // $PROJECT, $STAGE, $SERVICE
 // $DEPLOYMENT, $TESTSTRATEGY
@@ -187,7 +186,7 @@ func replaceKeptnPlaceholders(input string, keptnEvent baseKeptnEvent) string {
 
 	// first we do the regular keptn values
 	result = strings.Replace(result, "$TIMESTRING", keptnEvent.time, -1)
-	result = strings.Replace(result, "$TIMEUTC", keptnEvent.timeutc, -1)
+	result = strings.Replace(result, "$TIMEUTCSTRING", keptnEvent.timeutc, -1)
 	result = strings.Replace(result, "$TIMEUTCMS", keptnEvent.timeutcms, -1)
 
 	result = strings.Replace(result, "$CONTEXT", keptnEvent.context, -1)
@@ -359,7 +358,7 @@ func executeCommandWithKeptnContext(command string, args []string, keptnEvent ba
 	// first we build our core keptn values
 	keptnEnvs := []string{
 		"TIMESTRING=" + keptnEvent.time,
-		"TIMEUTC=" + keptnEvent.timeutc,
+		"TIMEUTCSTRING=" + keptnEvent.timeutc,
 		"TIMEUTCMS=" + keptnEvent.timeutcms,
 		"CONTEXT=" + keptnEvent.context,
 		"EVENT=" + keptnEvent.event,

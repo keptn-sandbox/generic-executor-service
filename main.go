@@ -52,6 +52,8 @@ func processKeptnCloudEvent(ctx context.Context, event cloudevents.Event) error 
 	logger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "jenkins-service")
 	logger.Info(fmt.Sprintf("gotEvent(%s): %s - %s", event.Type(), shkeptncontext, event.Context.GetID()))
 
+	logger.Info(fmt.Sprintf("%s -- %s -- %s", keptnEvent.time, keptnEvent.timeutc, keptnEvent.timeutcms))
+
 	// ********************************************
 	// Lets test on each possible Event Type and call the respective handler function
 	// ********************************************

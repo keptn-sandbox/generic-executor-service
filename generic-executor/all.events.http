@@ -1,0 +1,29 @@
+POST https://$ENV_DT_TENANT/api/v1/entity/infrastructure/custom/keptn
+Content-Type: application/json
+Authorization: Api-Token $ENV_DT_API_TOKEN
+
+{
+  "displayName": "Keptn",
+  "group": "Keptn",
+  "favicon": "https://pbs.twimg.com/profile_images/1089957894391398400/UgFeyejl_400x400.jpg",
+  "configUrl": "https://bridge.keptn.$ENV_KEPTN_DOMAIN",
+  "type": "Event",
+  "properties": {},
+  "tags": [ ],
+  "series": [
+  {
+    "timeseriesId": "custom:keptn.events.$EVENT",
+    "dimensions": {
+      "project": "$PROJECT",
+      "stage": "$STAGE",
+      "service": "$SERVICE"
+    },
+    "dataPoints": [
+      [
+        $TIMEUTCMS,
+        1
+      ]
+    ]
+  }
+  ]
+}

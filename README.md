@@ -52,15 +52,27 @@ kubectl delete -f deploy/service.yaml
 ## Usage
 
 The purpose of the *generic-executor-service" is to allow users to provide either .sh (shell scripts) or .http (HTTP Request) files that will be executed when Keptn sends different events, e.g: you want to execute a specific script when a deployment-finished event is sent.
-The *generic-executor-service* by default handles all Keptn events and then searches for either .sh or .http files in the stage & service specific Keptn Git repo in the subfolder *generic-executor*. Here is a sample folder structure in my Git repo for a specific service and stage:
+The *generic-executor-service* by default handles all Keptn events and then searches for either .sh or .http files in the stage & service specific Keptn Git repo in the subfolder *generic-executor*. If it doesnt find either all.events.* or event.* file it looks in the stage folder. If nothing is there it looks in the project repo (master branch). 
+
+Here is a sample folder structure in my Git repo for a specific service and stage:
 ```
-/MYSERVICE/genericexecutor
--- all.events.sh
--- configuration.change.sh
--- configuration.change.http
+[STAGE]/MYSERVICE/genericexecutor
+-- all.events.sh              <-- executed for all events for this service
+-- configuration.change.sh    <-- executed for configuration.change
+-- configuration.change.http  <-- executed for configuration.change
+
+[STAGE]/genericexecutor
+-- all.events.sh              <-- executed for all events for all services unless file exists on service level
+-- configuration.change.sh    <-- executed for configuration.change for all services unless file exists on service level
+-- configuration.change.http  <-- executed for configuration.change for all services unless file exists on service level
+
+[MASTER]/genericexecutor
+-- all.events.sh              <-- executed for all events unless file exists on stage service level
+-- configuration.change.sh    <-- executed for configuration.change for all services unless file exists on stage or service level
+-- configuration.change.http  <-- executed for configuration.change for all services unless file exists on stage or service level
 ```
 
-The *generic-executor-service* will first execute those files with the name all.events.sh and all.events.http. This gives you the ability to specify one set of action that should be executed for every Keptn event.
+The *generic-executor-service* will first execute those files with the name all.events.sh and all.events.http. This gives you the ability to specify one set of action that should be executed for every Keptn event. Good news is that you can also specify these files on a stage or project level. If the *generic-executor-service* doesnt find a file on service level it looks at stage level and then on project. The first that is found will be executed!
 After that the *generic-executor-service* will look for a file called KEPTN-EVENT.sh or KEPTN-EVENT.http where KEPTN-EVENT can be one of the following values corresponding to the Keptn events
 ```
 -- configuration.change.*
@@ -122,7 +134,7 @@ echo "TestToken = $ENV_TESTTOKEN"
 Last but not least - here are all the available placeholders for .http files and env-variables that are passed to your .sh files:
 ```
 // Event Context
-$CONTEXT,$EVENT,$SOURCE,$TIMESTRING,$TIMEUTC,$TIMEUTCMS
+$CONTEXT,$EVENT,$SOURCE,$TIMESTRING,$TIMEUTCSTRING,$TIMEUTCMS
 
 // Project Context
 $PROJECT,$STAGE,$SERVICE,$DEPLOYMENT,$TESTSTRATEGY
