@@ -32,9 +32,12 @@ import (
 
 type baseKeptnEvent struct {
 	// context, source and eventid
-	context string
-	source  string
-	event   string
+	context   string
+	source    string
+	event     string
+	time      string
+	timeutc   string
+	timeutcms string
 
 	// project & deployment specific
 	project      string
@@ -155,6 +158,7 @@ func getKeptnDomain() (string, error) {
 
 //
 // replaces $ placeholders with actual values
+// $TIME, $TIMEUTC, $TIMEUTCMS
 // $CONTEXT, $EVENT, $SOURCE
 // $PROJECT, $STAGE, $SERVICE
 // $DEPLOYMENT, $TESTSTRATEGY
@@ -167,6 +171,10 @@ func replaceKeptnPlaceholders(input string, keptnEvent baseKeptnEvent) string {
 	result := input
 
 	// first we do the regular keptn values
+	result = strings.Replace(result, "$TIME", keptnEvent.time, -1)
+	result = strings.Replace(result, "$TIMEUTC", keptnEvent.timeutc, -1)
+	result = strings.Replace(result, "$TIMEUTCMS", keptnEvent.timeutcms, -1)
+
 	result = strings.Replace(result, "$CONTEXT", keptnEvent.context, -1)
 	result = strings.Replace(result, "$EVENT", keptnEvent.event, -1)
 	result = strings.Replace(result, "$SOURCE", keptnEvent.source, -1)
@@ -335,6 +343,9 @@ func executeCommandWithKeptnContext(command string, args []string, keptnEvent ba
 
 	// first we build our core keptn values
 	keptnEnvs := []string{
+		"TIME=" + keptnEvent.time,
+		"TIMEUTC=" + keptnEvent.timeutc,
+		"TIMEUTCMS=" + keptnEvent.timeutcms,
 		"CONTEXT=" + keptnEvent.context,
 		"EVENT=" + keptnEvent.event,
 		"SOURCE=" + keptnEvent.source,

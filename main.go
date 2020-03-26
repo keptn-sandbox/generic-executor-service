@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	"github.com/cloudevents/sdk-go/pkg/cloudevents/client"
@@ -35,11 +36,17 @@ func processKeptnCloudEvent(ctx context.Context, event cloudevents.Event) error 
 	var shkeptncontext string
 	event.Context.ExtensionAs("shkeptncontext", &shkeptncontext)
 
+	nano := event.Time().UTC().UnixNano()
+	milli := nano / 1000000
+
 	// create a base Keptn Event
 	keptnEvent := baseKeptnEvent{
-		event:   event.Type(),
-		source:  event.Source(),
-		context: shkeptncontext,
+		event:     event.Type(),
+		source:    event.Source(),
+		context:   shkeptncontext,
+		time:      event.Time().String(),
+		timeutc:   event.Time().UTC().String(),
+		timeutcms: strconv.FormatInt(milli, 10),
 	}
 
 	logger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "jenkins-service")

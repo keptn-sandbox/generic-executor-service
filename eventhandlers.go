@@ -104,8 +104,9 @@ func _executeScriptOrHttEventHandler(event cloudevents.Event, keptnEvent baseKep
 //
 func handleConfigurationChangeEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.ConfigurationChangeEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Configuration Changed Event: %s", event.Context.GetID()))
+	keptnEvent.event = "configuration.change"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "configuration.change", logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent.event, logger)
 }
 
 //
@@ -114,8 +115,9 @@ func handleConfigurationChangeEvent(event cloudevents.Event, keptnEvent baseKept
 //
 func handleDeploymentFinishedEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.DeploymentFinishedEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Deployment Finished Event: %s", event.Context.GetID()))
+	keptnEvent.event = "deployment.finished"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "deployment.finished", logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
 }
 
 //
@@ -124,8 +126,9 @@ func handleDeploymentFinishedEvent(event cloudevents.Event, keptnEvent baseKeptn
 //
 func handleTestsFinishedEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.TestsFinishedEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Tests Finished Event: %s", event.Context.GetID()))
+	keptnEvent.event = "tests.finished"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "tests.finished", logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
 }
 
 //
@@ -134,8 +137,9 @@ func handleTestsFinishedEvent(event cloudevents.Event, keptnEvent baseKeptnEvent
 //
 func handleStartEvaluationEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.StartEvaluationEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Start Evaluation Event: %s", event.Context.GetID()))
+	keptnEvent.event = "start.evaluation"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "start.evaluation", logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
 }
 
 //
@@ -144,8 +148,9 @@ func handleStartEvaluationEvent(event cloudevents.Event, keptnEvent baseKeptnEve
 //
 func handleEvaluationDoneEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.EvaluationDoneEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Evaluation Done Event: %s", event.Context.GetID()))
+	keptnEvent.event = "evaluation.done"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "evaluation.done", logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
 }
 
 //
@@ -155,6 +160,7 @@ func handleEvaluationDoneEvent(event cloudevents.Event, keptnEvent baseKeptnEven
 //
 func handleProblemEvent(event cloudevents.Event, keptnEvent baseKeptnEvent, data *keptnevents.ProblemEventData, logger *keptnutils.Logger) error {
 	logger.Info(fmt.Sprintf("Handling Problem Open Event: %s", event.Context.GetID()))
+	keptnEvent.event = "problem.open"
 
-	return _executeScriptOrHttEventHandler(event, keptnEvent, data, "problem.open", logger)
+	return _executeScriptOrHttEventHandler(event, keptnEvent, data, keptnEvent, logger)
 }

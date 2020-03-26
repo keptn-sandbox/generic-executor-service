@@ -18,3 +18,5 @@ vendor/*
 generic-executor-service
 main
 _forAndi.sh
+script-repository/andi_dynatrace.metric.http
+script-repository/andi_create.dynatrace.metric.http
