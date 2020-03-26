@@ -1,4 +1,4 @@
-POST $ENV_DT_TENANT/api/v1/entity/infrastructure/custom/keptn
+POST https://$ENV_DT_TENANT/api/v1/entity/infrastructure/custom/keptn
 Content-Type: application/json
 Authorization: Api-Token $ENV_DT_API_TOKEN
   
