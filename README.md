@@ -78,6 +78,7 @@ Please have a look at the sample .http and .sh files to see how the *generic-exe
 Here a sample http script that shows you how to call an external webhook with this capability.
 The *generic-executor-service* will replace the core Keptn Event values as well as provides each label via $LABEL.LABELNAME and each Environment Variable via $ENV.ENVNAME
 ```
+configuration.change.http:
 POST https://webhook.site/YOURHOOKID
 Accept: application/json
 Cache-Control: no-cache
@@ -95,6 +96,27 @@ Content-Type: application/cloudevents+json
   "event": "$EVENT",
   "source": "$SOURCE"
 }
+```
+
+And here a sample bash script that the *generic-executor-service* is calling by setting all the Keptn context, labels and container environment variables as environment variables for this script:
+```
+all.event.sh:
+#!/bin/bash
+
+# This is a script that will be executed by the Keptn Generic Executor Service for ANY event as the filename is called all.events.sh!
+# It will be called with a couple of enviornment variables that are filled with Keptn Event Details, Env-Variables from the Service container as well as labels
+
+echo "This is my all.events.sh script"
+echo "Context = $CONTEXT"
+echo "Project = $PROJECT"
+echo "Project = $PROJECT"
+echo "Service = $SERVICE"
+echo "Stage = $STAGE"
+echo "GitCommit = $LABEL_gitcommit"
+echo "TestToken = $ENV_TESTTOKEN"
+
+# Here i could do whatever I want with these values, e.g: call an external tool :-)
+
 ```
 
 Enjoy the fun!
