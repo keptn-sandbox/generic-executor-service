@@ -10,8 +10,8 @@ Content-Type: application/cloudevents+json
   "project": "$PROJECT",
   "service": "$SERVICE",
   "stage": "$STAGE",
-  "mylabel" : "$LABEL.gitcommit",
-  "mytoken" : "$ENV.TESTTOKEN",
+  "mylabel" : "$LABEL_gitcommit",
+  "mytoken" : "$ENV_TESTTOKEN",
   "shkeptncontext": "$CONTEXT",
   "event": "$EVENT",
   "source": "$SOURCE"

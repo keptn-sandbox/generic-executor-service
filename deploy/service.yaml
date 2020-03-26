@@ -27,6 +27,13 @@
                 value: 'http://configuration-service.keptn.svc.cluster.local:8080'
               - name: YOURCUSTOMENV
                 value: YOURCUSTOMVALUE
+              - name: KEPTN_ENDPOINT
+                value: 'http://api.keptn.svc.cluster.local'
+              - name: KEPTN_API_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: keptn-api-token
+                    key: keptn-api-token
               - name: DT_API_TOKEN
                 valueFrom:
                   secretKeyRef:

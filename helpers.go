@@ -31,15 +31,21 @@ import (
  */
 
 type baseKeptnEvent struct {
+	// context, source and eventid
 	context string
 	source  string
 	event   string
 
+	// project & deployment specific
 	project      string
 	stage        string
 	service      string
 	deployment   string
 	testStrategy string
+
+	// only filled for deployment events
+	deploymentURILocal  string
+	deploymentURIPublic string
 
 	labels map[string]string
 }
@@ -150,8 +156,9 @@ func getKeptnDomain() (string, error) {
 //
 // replaces $ placeholders with actual values
 // $CONTEXT, $EVENT, $SOURCE
-// $PROJECT, $STAGE, $SERVICE, $DEPLOYMENT
-// $TESTSTRATEGY
+// $PROJECT, $STAGE, $SERVICE
+// $DEPLOYMENT, $TESTSTRATEGY
+// $DEPLOYMENTURILOCAL, $DEPLOYMENTURIPUBLIC
 // $LABEL.XXXX  -> will replace that with a label called XXXX
 // $ENV.XXXX    -> will replace that with an env variable called XXXX
 // $SECRET.YYYY -> will replace that with the k8s secret called YYYY
@@ -163,21 +170,25 @@ func replaceKeptnPlaceholders(input string, keptnEvent baseKeptnEvent) string {
 	result = strings.Replace(result, "$CONTEXT", keptnEvent.context, -1)
 	result = strings.Replace(result, "$EVENT", keptnEvent.event, -1)
 	result = strings.Replace(result, "$SOURCE", keptnEvent.source, -1)
+
 	result = strings.Replace(result, "$PROJECT", keptnEvent.project, -1)
 	result = strings.Replace(result, "$STAGE", keptnEvent.stage, -1)
 	result = strings.Replace(result, "$SERVICE", keptnEvent.service, -1)
 	result = strings.Replace(result, "$DEPLOYMENT", keptnEvent.deployment, -1)
 	result = strings.Replace(result, "$TESTSTRATEGY", keptnEvent.testStrategy, -1)
 
+	result = strings.Replace(result, "$DEPLOYMENTURILOCAL", keptnEvent.deploymentURILocal, -1)
+	result = strings.Replace(result, "$DEPLOYMENTURIPUBLIC", keptnEvent.deploymentURIPublic, -1)
+
 	// now we do the labels
 	for key, value := range keptnEvent.labels {
-		result = strings.Replace(result, "$LABEL."+key, value, -1)
+		result = strings.Replace(result, "$LABEL_"+key, value, -1)
 	}
 
 	// now we do all environment variables
 	for _, env := range os.Environ() {
 		pair := strings.SplitN(env, "=", 2)
-		result = strings.Replace(result, "$ENV."+pair[0], pair[1], -1)
+		result = strings.Replace(result, "$ENV_"+pair[0], pair[1], -1)
 	}
 
 	// TODO: iterate through k8s secrets!
@@ -332,6 +343,8 @@ func executeCommandWithKeptnContext(command string, args []string, keptnEvent ba
 		"STAGE=" + keptnEvent.stage,
 		"DEPLOYMENT=" + keptnEvent.deployment,
 		"TESTSTRATEGY" + keptnEvent.testStrategy,
+		"DEPLOYMENTURILOCAL", keptnEvent.deploymentURILocal,
+		"DEPLOYMENTURIPUBLIC", keptnEvent.deploymentURIPublic,
 	}
 
 	// we combine the environment variables of our running process with all those with labels
@@ -461,6 +474,12 @@ func sendDeploymentFinishedEvent(shkeptncontext string, incomingEvent *cloudeven
 	}
 	if tag != "" {
 		deploymentFinishedData.Tag = tag
+	}
+	if deploymentURILocal != "" {
+		deploymentFinishedData.DeploymentURILocal = deploymentURILocal
+	}
+	if deploymentURIPublic != "" {
+		deploymentFinishedData.DeploymentURIPublic = deploymentURIPublic
 	}
 
 	if labels != nil {

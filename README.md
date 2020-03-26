@@ -76,7 +76,7 @@ This gives you full flexiblity to provide a bash and http script for each event 
 Please have a look at the sample .http and .sh files to see how the *generic-executor-service* is not only calling these scripts or making http calls. The service is also passing Keptn Event specific context data such as PROJECT, SERVICE, LABELS and also ENV-Variables of the *generic-executor-service* pod as variables that you can reference. This gives you a lot of flexibility when writing these scripts.
 
 Here a sample http script that shows you how to call an external webhook with this capability.
-The *generic-executor-service* will replace the core Keptn Event values as well as provides each label via $LABEL.LABELNAME and each Environment Variable via $ENV.ENVNAME
+The *generic-executor-service* will replace the core Keptn Event values as well as provides each label via $LABEL_LABELNAME and each Environment Variable via $ENV_ENVNAME
 ```
 configuration.change.http:
 POST https://webhook.site/YOURHOOKID
@@ -90,8 +90,8 @@ Content-Type: application/cloudevents+json
   "project": "$PROJECT",
   "service": "$SERVICE",
   "stage": "$STAGE",
-  "mylabel" : "$LABEL.gitcommit",
-  "mytoken" : "$ENV.TESTTOKEN",
+  "mylabel" : "$LABEL_gitcommit",
+  "mytoken" : "$ENV_TESTTOKEN",
   "shkeptncontext": "$CONTEXT",
   "event": "$EVENT",
   "source": "$SOURCE"
@@ -118,6 +118,25 @@ echo "TestToken = $ENV_TESTTOKEN"
 # Here i could do whatever I want with these values, e.g: call an external tool :-)
 
 ```
+
+Last but not least - here are all the available placeholders for .http files and env-variables that are passed to your .sh files:
+```
+// Event Context
+$CONTEXT,$EVENT,$SOURCE
+
+// Project Context
+$PROJECT,$STAGE,$SERVICE,$DEPLOYMENT,$TESTSTRATEGY
+    
+// Deployment Finished specific
+$DEPLOYMENTURILOCAL,$DEPLOYMENTURIPUBLIC
+
+// Labels will be made available with a $LABEL_ prefix, e.g.:
+$LABEL_gitcommit,$LABEL_anotherlabel,$LABEL_xxxx
+
+// Environment variables you pass to the generic-executor-service container in the service.yaml will be available with $ENV_ prefix
+$ENV_YOURCUSTOMENV,$ENV_KEPTN_API_TOKEN,$ENV_KEPTN_ENDPOINT,...
+```
+
 
 Enjoy the fun!
 
