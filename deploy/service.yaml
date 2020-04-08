@@ -1,5 +1,5 @@
 ---
-  # Deployment of our keptn-service-template-go
+  # Deployment of our generic-executor-service
   apiVersion: apps/v1
   kind: Deployment
   metadata:
