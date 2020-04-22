@@ -1,8 +1,0 @@
-##
-POST https://myjenkins/myproject/testpipeline/runWithParameters
-Accept: application/json
-Cache-Control: no-cache
-Content-Type: application/cloudevents+json
-
-deployedApp=$deploymentURI
-###
