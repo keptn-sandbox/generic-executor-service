@@ -1,0 +1,51 @@
+##
+POST http://localhost:8080/
+Content-Type: application/cloudevents+json
+
+{
+  "contenttype": "application/json",
+  "data": {
+    "Problem" : {
+      "ImpactedEntity": "Failure rate increase on Web request service simplenode.prod.canary",
+      "PID": "-7463592197741453865",
+      "ProblemDetails": {
+        "displayName": "865",
+        "endTime": -1,
+        "hasRootCause": false,
+        "id": "-7463592197741453865_1584640080000V2",
+        "impactLevel": "SERVICE",
+        "severityLevel": "ERROR",
+        "startTime": 1584640080000,
+        "status": "OPEN"
+      },
+      "ProblemID": "865",
+      "ProblemTitle": "Failure rate increase",
+      "State": "OPEN"
+    },
+    "Action" : {
+      "Name" : "ActionName",
+      "Action" : "genericactionname",
+      "Description" : "Executes a generic action",
+      "Value" : {
+        "key1" : "value1",
+        "key2" : "value2"
+      }
+    },
+    "labels": {
+        "gitcommit" : "commit-ABCDEF123123",
+        "jenkinsjob" : "job1234",
+        "user" : "andi"
+    },
+    "project": "simpleproject",
+    "service": "simplenode",
+    "stage": "prod"
+  },
+  "id": "67d30f16-c8c8-4f5a-bc65-9f3b2508ea5d",
+  "source": "dynatrace",
+  "specversion": "0.2",
+  "time": "2020-03-19T17:57:07.557Z",
+  "type": "sh.keptn.event.action.triggered",
+  "shkeptncontext": "2d373436-3335-4932-b139-373734313435",
+  "label": "Action Triggered"
+}
+###
