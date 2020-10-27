@@ -43,19 +43,6 @@ func processKeptnCloudEvent(ctx context.Context, event cloudevents.Event) error 
 		return err
 	}
 
-	nano := event.Time().UTC().UnixNano()
-	milli := nano / 1000000
-
-	// create a base Keptn Event
-	keptnEvent := BaseKeptnEvent{
-		event:     event.Type(),
-		source:    event.Source(),
-		context:   shkeptncontext,
-		time:      event.Time().String(),
-		timeutc:   event.Time().UTC().String(),
-		timeutcms: strconv.FormatInt(milli, 10),
-	}
-
 	// ********************************************
 	// Lets test on each possible Event Type and call the respective handler function
 	// ********************************************

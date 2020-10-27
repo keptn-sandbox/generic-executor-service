@@ -17,28 +17,20 @@
       spec:
         containers:
           - name: generic-executor-service
-            image: grabnerandi/generic-executor-service:latest # Todo: Replace this with your image name
+            image: grabnerandi/generic-executor-service:0.2 # Todo: Replace this with your image name
             ports:
               - containerPort: 8080
             env:
               - name: EVENTBROKER
-                value: 'http://event-broker.keptn.svc.cluster.local/keptn'
+                value: 'http://event-broker/keptn'
               - name: CONFIGURATION_SERVICE
-                value: 'http://configuration-service.keptn.svc.cluster.local:8080'
+                value: 'http://configuration-service:8080'
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace                
               - name: YOURCUSTOMENV
                 value: YOURCUSTOMVALUE
-              - name: KEPTN_ENDPOINT
-                value: 'http://api.keptn.svc.cluster.local'
-              - name: KEPTN_DOMAIN
-                valueFrom:
-                  configMapKeyRef:
-                    name: keptn-domain
-                    key: app_domain
-              - name: KEPTN_API_TOKEN
-                valueFrom:
-                  secretKeyRef:
-                    name: keptn-api-token
-                    key: keptn-api-token
               - name: DT_API_TOKEN
                 valueFrom:
                   secretKeyRef:
@@ -49,6 +41,22 @@
                   secretKeyRef:
                     name: dynatrace
                     key: DT_TENANT
+              - name: KEPTN_API_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: dynatrace
+                    key: KEPTN_API_URL
+              - name: KEPTN_API_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: dynatrace
+                    key: KEPTN_API_TOKEN
+              - name: KEPTN_BRIDGE_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: dynatrace
+                    key: KEPTN_BRIDGE_URL
+                    optional: true
 ---
   # Expose generic-executor-service via Port 8080 within the cluster
   apiVersion: v1

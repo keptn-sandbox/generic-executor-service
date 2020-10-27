@@ -13,6 +13,7 @@ This implements a generic-executor-service for Keptn.
 | Keptn Version    | [Generic Executor Service for Keptn](https://hub.docker.com/r/grabnerandi/generic-executor-service/tags) |
 |:----------------:|:----------------------------------------:|
 |       0.6.1      | grabnerandi/generic-executor-service:latest |
+|       0.7.2      | grabnerandi/generic-executor-service:0.2 |
 
 ## Installation
 
