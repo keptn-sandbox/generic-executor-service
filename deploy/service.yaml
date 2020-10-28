@@ -54,7 +54,7 @@ spec:
       labels:
         run: generic-executor-service
     spec:
-      serviceAccountName: generic-exectuor-service
+      serviceAccountName: generic-executor-service
       containers:
         - name: generic-executor-service
           image: grabnerandi/generic-executor-service:0.2
