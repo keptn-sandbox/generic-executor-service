@@ -351,10 +351,11 @@ func HandleActionTriggeredEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 			return err
 		}
 
+		// making sure we pass Problem URL and Executor Script as labels
 		if data.Labels == nil {
 			data.Labels = make(map[string]string)
 		}
-
+		data.Labels["Problem URL"] = keptnEvent.problemURL
 		if scriptName != "" {
 			data.Labels["Executor Script"] = scriptName
 		}
