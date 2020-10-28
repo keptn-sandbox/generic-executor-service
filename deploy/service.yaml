@@ -97,7 +97,6 @@ spec:
                   name: dynatrace
                   key: KEPTN_BRIDGE_URL
                   optional: true
-
         - name: distributor
           image: keptn/distributor:0.7.2
           ports:
