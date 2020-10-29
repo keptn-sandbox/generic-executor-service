@@ -30,11 +30,27 @@ const EXECUTESTATUS_SUCCESSFULL = 1
 const EXECUTESTATUS_FAILED = 2
 const EXECUTESTATUS_ACTIONFOUND = 3
 
-//
+/**
+ * executeScriptOrHTTP
+ * This method will iterate through the bash and http filenames. If the filename is found it will execute it if executeIfExits==true.
+ * If onlyFirstMatch==true this method will stop after it has found the first matching filename. Otherwise it will continue finding more matches. This would for instance allow executing multiple scripts such as mypspecialscript.ph and all.events.sh
+ * When calling a bashscript the args are passed as arguments to that script
+ * Parameters
+ * @bashfilename: filenames that the service tries to locate. This can either be shell scripts python scripts or anything else that is executable in the container
+ * @httpFilenames: filenames of http scripts
+ * @args: List of command line argumetns passed to the bashfiles
+ * @executeIfExists: if true and a script is found it will be executed - otherwise it just returns EXECUTESTATUS_ACTIONFOUND
+ * @onlyFirstMatch: if true will only execute the first matching script - otherwise it will keep looking for more matches
+ *
+ * Return:
+ * int: status, e.g: EXECUTESTATUS_XXX
+ * string: name of the first matched script
+ * error: any error that may have occured
+ */
 // if any of the passed files exist either executes the bash or the http request
 // The return status depends on the success of the executed script or HTTP Request. If the script fails or if the HTTP call returns a status code >= 300 the call is considered failed
 //
-func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data interface{}, bashFilenames, httpFilenames []string, args []string, executeIfExists bool) (int, string, error) {
+func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data interface{}, bashFilenames, httpFilenames []string, args []string, executeIfExists bool, onlyFirstMatch bool) (int, string, error) {
 
 	returnStatus := EXECUTESTATUS_NOACTIONFOUND
 	var returnError error
@@ -52,6 +68,7 @@ func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data i
 				return EXECUTESTATUS_ACTIONFOUND, executedScript, nil
 			}
 
+			// Lets execute it
 			var output string
 			output, err = executeCommandWithKeptnContext(resource, args, keptnEvent, nil)
 			if err != nil {
@@ -61,6 +78,12 @@ func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data i
 			} else {
 				myKeptn.Logger.Info("Script output: " + output)
 				returnStatus = EXECUTESTATUS_SUCCESSFULL
+				returnError = nil
+			}
+
+			// only first match?
+			if onlyFirstMatch {
+				return returnStatus, executedScript, returnError
 			}
 		} else {
 			myKeptn.Logger.Debug("No script found at " + bashFilename)
@@ -81,6 +104,7 @@ func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data i
 				return EXECUTESTATUS_ACTIONFOUND, executedScript, nil
 			}
 
+			// Lets execute it
 			parsedRequest, err = parseHttpRequestFromHttpTextFile(keptnEvent, httpFilename)
 			if err == nil {
 				statusCode, body, requestError := executeGenericHttpRequest(parsedRequest)
@@ -101,6 +125,11 @@ func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data i
 				myKeptn.Logger.Error(fmt.Sprintf("Error: %s", err.Error()))
 				returnStatus = EXECUTESTATUS_FAILED
 			}
+
+			// only first match?
+			if onlyFirstMatch {
+				return returnStatus, executedScript, returnError
+			}
 		} else {
 			myKeptn.Logger.Debug("No http file found at " + httpFilename)
 		}
@@ -112,21 +141,22 @@ func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data i
 //
 // Handles an incoming event
 //
-func _executeScriptOrHttEventHandler(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data interface{}, filePrefix string, executeIfExists bool) (int, string, error) {
-	// we allow different files to be specified by the end user
+func _executeScriptOrHttEventHandler(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data interface{}, filePrefix string, executeIfExists bool, onlyFirstMatch bool) (int, string, error) {
+	// we allow different files to be specified by the end user - we first look for the more specific ones that include the file name
 	bashFilenames := []string{
-		GenericScriptFolderBase + "all.events.sh",
 		GenericScriptFolderBase + filePrefix + ".sh",
-		GenericScriptFolderBase + "all.events.py",
 		GenericScriptFolderBase + filePrefix + ".py",
+		GenericScriptFolderBase + "all.events.sh",
+		GenericScriptFolderBase + "all.events.py",
 	}
 
 	httpFilenames := []string{
-		GenericScriptFolderBase + "all.events.http",
 		GenericScriptFolderBase + filePrefix + ".http",
+		GenericScriptFolderBase + "all.events.http",
 	}
 
-	// First - lets store the event as a json file on the filesystem
+	//
+	// First - lets store the event as a json file on the filesystem as we are passing it to the script as an argument
 	eventJsonPath := "./tmpdata/"
 	eventJsonFileName := eventJsonPath + keptnEvent.context + ".event.json"
 	dataAsJson, err := json.Marshal(data)
@@ -147,11 +177,11 @@ func _executeScriptOrHttEventHandler(myKeptn *keptn.Keptn, keptnEvent BaseKeptnE
 		myKeptn.Logger.Error(fmt.Sprintf("Couldnt marshal incoming event to JSON string: %s", err.Error()))
 	}
 
-	// ass the event filename as argument
+	// pass the event filename as argument
 	args := []string{eventJsonFileName}
 
 	// now lets execute these scripts!
-	status, scriptName, err := executeScriptOrHTTP(myKeptn, keptnEvent, data, bashFilenames, httpFilenames, args, executeIfExists)
+	status, scriptName, err := executeScriptOrHTTP(myKeptn, keptnEvent, data, bashFilenames, httpFilenames, args, executeIfExists, onlyFirstMatch)
 	if err != nil {
 		myKeptn.Logger.Error(fmt.Sprintf("Error: %s", err.Error()))
 	}
@@ -208,7 +238,7 @@ func HandleConfigureMonitoringEvent(myKeptn *keptn.Keptn, incomingEvent cloudeve
 	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, "", data.Service, map[string]string{})
 
 	eventName := "monitoring.configure"
-	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true)
+	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 	return err
 }
 
@@ -222,7 +252,7 @@ func HandleConfigurationChangeEvent(myKeptn *keptn.Keptn, incomingEvent cloudeve
 	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
 
 	eventName := "configuration.change"
-	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true)
+	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 	return err
 }
 
@@ -242,7 +272,7 @@ func HandleDeploymentFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudeven
 	keptnEvent.tag = data.Tag
 
 	eventName := "deployment.finished"
-	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true)
+	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 	return err
 }
 
@@ -260,7 +290,7 @@ func HandleTestsFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Ev
 	keptnEvent.testEnd = data.End
 
 	eventName := "tests.finished"
-	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true)
+	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 	return err
 }
 
@@ -278,7 +308,7 @@ func HandleStartEvaluationEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 	keptnEvent.evaluationEnd = data.End
 
 	eventName := "start.evaluation"
-	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true)
+	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 	return err
 }
 
@@ -295,7 +325,7 @@ func HandleEvaluationDoneEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.E
 	keptnEvent.evaluationResult = data.Result
 
 	eventName := "evaluation.done"
-	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true)
+	_, _, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 	return err
 }
 
@@ -338,7 +368,7 @@ func HandleActionTriggeredEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 	keptnEvent.problemURL = data.Problem.ProblemURL
 
 	eventName := "action.triggered." + data.Action.Action
-	status, scriptName, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, false)
+	status, scriptName, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, false, true)
 
 	// lets see if we have found an action - if so - lets notify keptn - then execute it - and the report when we are done
 	if status == EXECUTESTATUS_ACTIONFOUND {
@@ -351,13 +381,14 @@ func HandleActionTriggeredEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 			return err
 		}
 
-		// making sure we pass Problem URL and Executor Script as labels
+		// making sure we pass Problem URL, Action and Executor Script as labels
 		if data.Labels == nil {
 			data.Labels = make(map[string]string)
 		}
 		data.Labels["Problem URL"] = keptnEvent.problemURL
+		data.Labels["Action"] = data.Action.Action
 		if scriptName != "" {
-			data.Labels["Executor Script"] = scriptName
+			data.Labels["Script"] = scriptName
 		}
 
 		err = myKeptn.SendActionStartedEvent(&incomingEvent, data.Labels, "generic-executor-service")
@@ -368,7 +399,7 @@ func HandleActionTriggeredEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 
 		// Step 2: Lets execute the Script
 		var actionResult keptn.ActionResult
-		status, scriptName, err = _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true)
+		status, scriptName, err = _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 		if status == EXECUTESTATUS_SUCCESSFULL {
 			log.Printf("Successful execution of action")
 			actionResult.Result = keptn.ActionResultPass
