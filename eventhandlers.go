@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	keptn "github.com/keptn/go-utils/pkg/lib"
@@ -185,6 +186,9 @@ func _executeScriptOrHttEventHandler(myKeptn *keptn.Keptn, keptnEvent BaseKeptnE
 	if err != nil {
 		myKeptn.Logger.Error(fmt.Sprintf("Error: %s", err.Error()))
 	}
+
+	// cleanup the scriptName - remove the GenericScriptFolderBase
+	scriptName = strings.TrimPrefix(scriptName, GenericScriptFolderBase)
 
 	return status, scriptName, err
 }
@@ -386,9 +390,8 @@ func HandleActionTriggeredEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 			data.Labels = make(map[string]string)
 		}
 		data.Labels["Problem URL"] = keptnEvent.problemURL
-		data.Labels["Action"] = data.Action.Action
 		if scriptName != "" {
-			data.Labels["Script"] = scriptName
+			data.Labels[data.Action.Action] = scriptName
 		}
 
 		err = myKeptn.SendActionStartedEvent(&incomingEvent, data.Labels, "generic-executor-service")
