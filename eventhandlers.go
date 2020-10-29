@@ -69,9 +69,16 @@ func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data i
 				return EXECUTESTATUS_ACTIONFOUND, executedScript, nil
 			}
 
+			// if this is a python script our command is actually python3 and we pass the script as an argument
+			argsToUse := args
+			if strings.Index(bashFilename, ".py") > 0 {
+				argsToUse = append([]string{resource}, args...)
+				resource = "python3"
+			}
+
 			// Lets execute it
 			var output string
-			output, err = executeCommandWithKeptnContext(resource, args, keptnEvent, nil)
+			output, err = executeCommandWithKeptnContext(resource, argsToUse, keptnEvent, nil)
 			if err != nil {
 				myKeptn.Logger.Error(fmt.Sprintf("Error executing script: %s", err.Error()))
 				returnStatus = EXECUTESTATUS_FAILED
@@ -87,7 +94,7 @@ func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data i
 				return returnStatus, executedScript, returnError
 			}
 		} else {
-			myKeptn.Logger.Debug("No script found at " + bashFilename)
+			// myKeptn.Logger.Debug("No script found at " + bashFilename)
 		}
 	}
 
@@ -237,7 +244,7 @@ func initializeKeptnBaseEvent(incomingEvent cloudevents.Event, project, stage, s
 
 // Handles ConfigureMonitoringEventType = "sh.keptn.event.monitoring.configure"
 func HandleConfigureMonitoringEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.ConfigureMonitoringEventData) error {
-	log.Printf("Handling Configure Monitoring Event: %s", incomingEvent.Context.GetID())
+	// log.Printf("Handling Configure Monitoring Event: %s", incomingEvent.Context.GetID())
 
 	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, "", data.Service, map[string]string{})
 
@@ -251,7 +258,7 @@ func HandleConfigureMonitoringEvent(myKeptn *keptn.Keptn, incomingEvent cloudeve
 // TODO: add in your handler code
 //
 func HandleConfigurationChangeEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.ConfigurationChangeEventData) error {
-	log.Printf("Handling Configuration Changed Event: %s", incomingEvent.Context.GetID())
+	// log.Printf("Handling Configuration Changed Event: %s", incomingEvent.Context.GetID())
 
 	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
 
@@ -265,7 +272,7 @@ func HandleConfigurationChangeEvent(myKeptn *keptn.Keptn, incomingEvent cloudeve
 // TODO: add in your handler code
 //
 func HandleDeploymentFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.DeploymentFinishedEventData) error {
-	log.Printf("Handling Deployment Finished Event: %s", incomingEvent.Context.GetID())
+	// log.Printf("Handling Deployment Finished Event: %s", incomingEvent.Context.GetID())
 
 	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
 	keptnEvent.deployment = data.DeploymentStrategy
@@ -285,7 +292,7 @@ func HandleDeploymentFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudeven
 // TODO: add in your handler code
 //
 func HandleTestsFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.TestsFinishedEventData) error {
-	log.Printf("Handling Tests Finished Event: %s", incomingEvent.Context.GetID())
+	// log.Printf("Handling Tests Finished Event: %s", incomingEvent.Context.GetID())
 
 	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
 	keptnEvent.deployment = data.DeploymentStrategy
@@ -303,7 +310,7 @@ func HandleTestsFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Ev
 // TODO: add in your handler code
 //
 func HandleStartEvaluationEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.StartEvaluationEventData) error {
-	log.Printf("Handling Start Evaluation Event: %s", incomingEvent.Context.GetID())
+	// log.Printf("Handling Start Evaluation Event: %s", incomingEvent.Context.GetID())
 
 	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
 	keptnEvent.deployment = data.DeploymentStrategy
@@ -321,7 +328,7 @@ func HandleStartEvaluationEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 // TODO: add in your handler code
 //
 func HandleEvaluationDoneEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.EvaluationDoneEventData) error {
-	log.Printf("Handling Evaluation Done Event: %s", incomingEvent.Context.GetID())
+	// log.Printf("Handling Evaluation Done Event: %s", incomingEvent.Context.GetID())
 
 	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
 	keptnEvent.deployment = data.DeploymentStrategy
@@ -349,7 +356,7 @@ func HandleInternalGetSLIEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.E
 // TODO: add in your handler code
 //
 func HandleProblemEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.ProblemEventData) error {
-	log.Printf("Handling Problem Event: %s", incomingEvent.Context.GetID())
+	// log.Printf("Handling Problem Event: %s", incomingEvent.Context.GetID())
 
 	// Deprecated since Keptn 0.7.0 - use the HandleActionTriggeredEvent instead
 
@@ -361,7 +368,7 @@ func HandleProblemEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, d
 // TODO: add in your handler code
 //
 func HandleActionTriggeredEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.ActionTriggeredEventData) error {
-	log.Printf("Handling Action Triggered Event: %s", incomingEvent.Context.GetID())
+	// log.Printf("Handling Action Triggered Event: %s", incomingEvent.Context.GetID())
 
 	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
 	keptnEvent.action = data.Action.Action
@@ -370,6 +377,16 @@ func HandleActionTriggeredEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 	keptnEvent.problemTitle = data.Problem.ProblemTitle
 	keptnEvent.pid = data.Problem.PID
 	keptnEvent.problemURL = data.Problem.ProblemURL
+
+	// Get remediation values from data.
+	keptnEvent.remediationValues = make(map[string]string)
+	values, ok := data.Action.Value.(map[string]interface{})
+	if ok {
+		for keyValue, valueValue := range values {
+			keptnEvent.remediationValues[keyValue] = fmt.Sprintf("%v", valueValue)
+			log.Println(keyValue + ": " + keptnEvent.remediationValues[keyValue])
+		}
+	}
 
 	eventName := "action.triggered." + data.Action.Action
 	status, scriptName, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, false, true)

@@ -58,7 +58,8 @@ type BaseKeptnEvent struct {
 	pid          string
 	problemURL   string
 
-	labels map[string]string
+	labels            map[string]string
+	remediationValues map[string]string
 }
 
 type genericHttpRequest struct {
@@ -92,7 +93,7 @@ func getKeptnResource(myKeptn *keptn.Keptn, resource string) (string, error) {
 			requestedResource, err = resourceHandler.GetProjectResource(myKeptn.KeptnBase.Project, resource)
 
 			if err != nil || requestedResource.ResourceContent == "" {
-				myKeptn.Logger.Debug(fmt.Sprintf("Keptn Resource not found: %s/%s/%s/%s - %s", myKeptn.KeptnBase.Project, myKeptn.KeptnBase.Stage, myKeptn.KeptnBase.Service, resource, err))
+				// myKeptn.Logger.Debug(fmt.Sprintf("Keptn Resource not found or empty: %s/%s/%s/%s - %s", myKeptn.KeptnBase.Project, myKeptn.KeptnBase.Stage, myKeptn.KeptnBase.Service, resource, err))
 				return "", err
 			}
 
@@ -191,13 +192,18 @@ func replaceKeptnPlaceholders(input string, keptnEvent BaseKeptnEvent) string {
 
 	// now we do the labels
 	for key, value := range keptnEvent.labels {
-		result = strings.Replace(result, "$LABEL_"+key, value, -1)
+		result = strings.Replace(result, "$LABEL_"+strings.ToUpper(key), value, -1)
+	}
+
+	// now we do the remediation values
+	for remediationKey, remediationValue := range keptnEvent.remediationValues {
+		result = strings.Replace(result, "$VALUE_"+strings.ToUpper(remediationKey), remediationValue, -1)
 	}
 
 	// now we do all environment variables
 	for _, env := range os.Environ() {
 		pair := strings.SplitN(env, "=", 2)
-		result = strings.Replace(result, "$ENV_"+pair[0], pair[1], -1)
+		result = strings.Replace(result, "$ENV_"+strings.ToUpper(pair[0]), pair[1], -1)
 	}
 
 	// TODO: iterate through k8s secrets!
@@ -366,21 +372,26 @@ func executeCommandWithKeptnContext(command string, args []string, keptnEvent Ba
 	}
 
 	// we combine the environment variables of our running process with all those with labels
-	// those from our local process are prefixed with ENV_ , e.g: ENV_processenv=abcd
-	// those coming from labels are prefixed with LABEL_, e.g: LABEL_mylabel=abcd
+	// those from our local process are prefixed with ENV_ , e.g: ENV_PROCESSENV=abcd
+	// those coming from labels are prefixed with LABEL_, e.g: LABEL_MYLABEL=abcd
 	localEnvs := os.Environ()
-	commandEnvs := make([]string, len(keptnEnvs)+len(localEnvs)+len(keptnEvent.labels))
+	commandEnvs := make([]string, len(keptnEnvs)+len(localEnvs)+len(keptnEvent.labels)+len(keptnEvent.remediationValues))
 	var envIx = 0
 	for _, env := range keptnEnvs {
 		commandEnvs[envIx] = env
 		envIx++
 	}
 	for _, env := range localEnvs {
-		commandEnvs[envIx] = "ENV_" + env
+		commandEnvs[envIx] = "ENV_" + strings.ToUpper(env)
 		envIx++
 	}
 	for key, value := range keptnEvent.labels {
-		commandEnvs[envIx] = "LABEL_" + key + "=" + value
+		commandEnvs[envIx] = "LABEL_" + strings.ToUpper(key) + "=" + value
+		envIx++
+	}
+	// now we do the remediation values
+	for remediationKey, remediationValue := range keptnEvent.remediationValues {
+		commandEnvs[envIx] = "VALUE_" + strings.ToUpper(remediationKey) + "=" + remediationValue
 		envIx++
 	}
 

@@ -11,6 +11,7 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+tmpdata/*
 vendor/*
 .DS_Store
 
@@ -20,3 +21,4 @@ main
 _forAndi.sh
 script-repository/andi_dynatrace.metric.http
 script-repository/andi_create.dynatrace.metric.http
+tmpdata/2d373436-3335-4932-b139-373734313435.event.json
