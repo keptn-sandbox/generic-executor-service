@@ -1,6 +1,6 @@
 # Generic Executor Service for Keptn
 
-This is a Sandbox Keptn Service that enables generic execution of bash files and HTTP requests for individual Keptn Events 
+This is a Sandbox Keptn Service that enables generic execution of bash files, Python3 and HTTP requests for individual Keptn Events 
 
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/grabnerandi/generic-executor-service)
 [![Build Status](https://travis-ci.org/grabnerandi/generic-executor-service.svg?branch=master)](https://travis-ci.org/grabnerandi/generic-executor-service)
@@ -13,7 +13,7 @@ This implements a generic-executor-service for Keptn.
 | Keptn Version    | [Generic Executor Service for Keptn](https://hub.docker.com/r/grabnerandi/generic-executor-service/tags) |
 |:----------------:|:----------------------------------------:|
 |       0.6.1      | grabnerandi/generic-executor-service:latest |
-|       0.7.2      | grabnerandi/generic-executor-service:0.2 |
+|       0.7.x      | grabnerandi/generic-executor-service:0.2 |
 
 ## Installation
 
@@ -52,25 +52,25 @@ kubectl delete -f deploy/service.yaml
 
 ## Usage
 
-The purpose of the *generic-executor-service" is to allow users to provide either .sh (shell scripts) or .http (HTTP Request) files that will be executed when Keptn sends different events, e.g: you want to execute a specific script when a deployment-finished event is sent.
+The purpose of the *generic-executor-service" is to allow users to provide either .sh (shell scripts), .py (Python3) or .http (HTTP Request) files that will be executed when Keptn sends different events, e.g: you want to execute a specific script when a deployment-finished event is sent.
 The *generic-executor-service* by default handles all Keptn events and then searches for either .sh or .http files in the stage & service specific Keptn Git repo in the subfolder *generic-executor*. If it doesnt find either all.events.* or event.* file it looks in the stage folder. If nothing is there it looks in the project repo (master branch). 
 
 Here is a sample folder structure in my Git repo for a specific service and stage:
 ```
 [STAGE]/MYSERVICE/genericexecutor
 -- all.events.sh              <-- executed for all events for this service
--- configuration.change.sh    <-- executed for configuration.change
+-- configuration.change.py    <-- executed for configuration.change
 -- configuration.change.http  <-- executed for configuration.change
 
 [STAGE]/genericexecutor
--- all.events.sh              <-- executed for all events for all services unless file exists on service level
+-- all.events.py              <-- executed for all events for all services unless file exists on service level
 -- configuration.change.sh    <-- executed for configuration.change for all services unless file exists on service level
 -- configuration.change.http  <-- executed for configuration.change for all services unless file exists on service level
 
 [MASTER]/genericexecutor
--- all.events.sh              <-- executed for all events unless file exists on stage service level
+-- all.events.http            <-- executed for all events unless file exists on stage service level
 -- configuration.change.sh    <-- executed for configuration.change for all services unless file exists on stage or service level
--- configuration.change.http  <-- executed for configuration.change for all services unless file exists on stage or service level
+-- configuration.change.py    <-- executed for configuration.change for all services unless file exists on stage or service level
 ```
 
 The *generic-executor-service* will first execute those files with the name all.events.sh and all.events.http. This gives you the ability to specify one set of action that should be executed for every Keptn event. Good news is that you can also specify these files on a stage or project level. If the *generic-executor-service* doesnt find a file on service level it looks at stage level and then on project. The first that is found will be executed!
@@ -82,15 +82,17 @@ After that the *generic-executor-service* will look for a file called KEPTN-EVEN
 -- start.evaluation.*
 -- evaluation.done.*
 -- problem.open.*
+-- action.triggered.*
 ```
 
-This gives you full flexiblity to provide a bash and http script for each event or specify a bash and http script that shoudl be executed for all events.
+This gives you full flexiblity to provide a bash, python or http script for each event or specify a bash and http script that shoudl be executed for all events.
 
-Please have a look at the sample .http and .sh files to see how the *generic-executor-service* is not only calling these scripts or making http calls. The service is also passing Keptn Event specific context data such as PROJECT, SERVICE, LABELS and also ENV-Variables of the *generic-executor-service* pod as variables that you can reference. This gives you a lot of flexibility when writing these scripts.
+Please have a look at the sample .http, .py and .sh files to see how the *generic-executor-service* is not only calling these scripts or making http calls. The service is also passing Keptn Event specific context data such as PROJECT, SERVICE, LABELS and also ENV-Variables of the *generic-executor-service* pod as variables that you can reference. This gives you a lot of flexibility when writing these scripts.
 
+### Sample HTTP Webhook
 Here a sample http script that shows you how to call an external webhook with this capability.
 The *generic-executor-service* will replace the core Keptn Event values as well as provides each label via $LABEL_LABELNAME and each Environment Variable via $ENV_ENVNAME
-```
+```http
 configuration.change.http:
 POST https://webhook.site/YOURHOOKID
 Accept: application/json
@@ -111,8 +113,9 @@ Content-Type: application/cloudevents+json
 }
 ```
 
+### Sample Bash Script
 And here a sample bash script that the *generic-executor-service* is calling by setting all the Keptn context, labels and container environment variables as environment variables for this script:
-```
+```bash
 all.event.sh:
 #!/bin/bash
 
@@ -132,7 +135,29 @@ echo "TestToken = $ENV_TESTTOKEN"
 
 ```
 
-Last but not least - here are all the available placeholders for .http files and env-variables that are passed to your .sh files:
+### Sample Python Script
+And here a sample python script that the *generic-executor-service* is calling by setting all the Keptn context, labels and container environment variables as environment variables for this script:
+```python
+action.triggered.myaction.py:
+import os
+import sys
+
+# Lets get the first parameter which could potentially be a local file name
+methodArg = ""
+if len(sys.argv) > 1:
+    methodArg = sys.argv[1]
+
+print("This is my genericactionname handler script and I got passed " + methodArg + " as parameter")
+print("I also have some env variables, e.g: PID=" + os.getenv('PID', "") + ", CONTEXT=" + os.getenv('CONTEXT', ""))
+print("SOURCE=" + os.getenv('SOURCE',""))
+print("PROJECT=" + os.getenv('PROJECT',""))
+print("PROBLEMTITLE=" + os.getenv('PROBLEMTITLE',""))
+
+```
+
+### Environment Variables ...
+
+Last but not least - here are all the available placeholders for .http files and env-variables that are passed to your .sh and .py files:
 ```
 // Event Context
 $CONTEXT,$EVENT,$SOURCE,$TIMESTRING,$TIMEUTCSTRING,$TIMEUTCMS
@@ -150,8 +175,41 @@ $LABEL_gitcommit,$LABEL_anotherlabel,$LABEL_xxxx
 $ENV_YOURCUSTOMENV,$ENV_KEPTN_API_TOKEN,$ENV_KEPTN_ENDPOINT,...
 ```
 
+### Event file passed as parameter
+
+You may have seen it in the python example. The *generic-exectutor-service* is also passing the full Keptn Event that triggered that execution as script argument. The first parameter is the reference to that filename. This gives you full access to the raw Keptn CloudEvent.
 
 Enjoy the fun!
+
+## Usage for Remediation Actions
+
+The *generic-executor-service* provides an easy way to define your own **Auto-Remediation Actions** that Keptn can trigger as a part of an Remediation Workflow.
+In order for you to have your script exectued for a particular remediation action simply give the script the following name: action.triggered.<ACTIONNAME>.xx.
+Actionname references the name of the action in your remediation.yaml. So - the following remediation.yaml defines the action *poweroutageaction*:
+```yaml
+apiVersion: spec.keptn.sh/0.1.4
+kind: Remediation
+metadata:
+  name: dynatrace-demo-remediation
+spec:
+  remediations:  
+  - problemType: Simulated Power outage
+    actionsOnOpen:
+    - name: Handle Power Outage
+      action: poweroutageaction
+      description: In a power outage scenario we make sure nobody dripped on a cable
+      value:
+        Message: Please make sure nobody dripped on a cable!
+```
+
+To provide a script for that action you can upload the following filenames:
+* action.triggered.poweroutageaction.py
+* action.triggered.poweroutageaction.sh
+* action.triggered.poweroutageaction.http
+
+Besides the environment variables described above this script also gets env-variables passed with the prefix VALUE_ for each value in the values list. In the example above there is one *value* with the name *Message*. To access the value of this you can simply access the environment-variable *VALUE_MESSAGE*
+For a full example check out the script *action.triggered.myaction.py* which you can find in the files subfolder!
+
 
 ## Development
 
