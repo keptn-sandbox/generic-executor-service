@@ -24,7 +24,7 @@ Content-Type: application/cloudevents+json
     },
     "Action" : {
       "Name" : "ActionName",
-      "Action" : "genericactionname",
+      "Action" : "myaction",
       "Description" : "Executes a generic action",
       "Value" : {
         "key1" : "value1",

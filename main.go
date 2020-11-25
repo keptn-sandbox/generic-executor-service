@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -136,14 +135,11 @@ func processKeptnCloudEvent(ctx context.Context, event cloudevents.Event) error 
 		}
 
 		return HandleConfigureMonitoringEvent(myKeptn, event, configureMonitoringEventData)
+	} else {
+		log.Printf(fmt.Sprintf("Not handling Keptn Cloud Event: %s", event.Type()))
 	}
 
-	// Unknown Event -> Throw Error!
-	var errorMsg string
-	errorMsg = fmt.Sprintf("Unhandled Keptn Cloud Event: %s", event.Type())
-
-	log.Print(errorMsg)
-	return errors.New(errorMsg)
+	return nil
 }
 
 /**

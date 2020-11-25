@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -72,13 +73,36 @@ type genericHttpRequest struct {
 var KeptnOptions = keptn.KeptnOpts{}
 
 /**
+ * Removes the list of files
+ */
+func removeFiles(myKeptn *keptn.Keptn, filesToRemove []string) {
+
+	for _, fileName := range filesToRemove {
+
+		err := os.Remove(fileName)
+		if err != nil {
+			myKeptn.Logger.Error(err.Error())
+		}
+	}
+}
+
+/**
  * Retrieves a resource (=file) from the keptn configuration repo and stores it in the local file system
  */
-func getKeptnResource(myKeptn *keptn.Keptn, resource string) (string, error) {
+func getKeptnResource(myKeptn *keptn.Keptn, resource string, uniqueFilePrefix string) (string, error) {
+
+	// we create our uniqueFileName with the prefix
+	// here some examples on what that looks like
+	// myfile.txt -> PREFIX_myfile.txt
+	// folder/myfile.txt -> folder/PREFIX_myfile.txt
+	uniqueFileName := strings.Replace(resource, "/", "/"+uniqueFilePrefix+"_", 1)
+	if uniqueFilePrefix != "" {
+		os.RemoveAll(uniqueFileName)
+	}
 
 	// if we run in a runlocal mode we are just getting the file from the local disk
 	if KeptnOptions.UseLocalFileSystem {
-		return _getKeptnResourceFromLocal(resource)
+		return _getKeptnResourceFromLocal(resource, uniqueFileName)
 	}
 
 	resourceHandler := api.NewResourceHandler(KeptnOptions.ConfigurationServiceURL)
@@ -106,8 +130,7 @@ func getKeptnResource(myKeptn *keptn.Keptn, resource string) (string, error) {
 	}
 
 	// now store that file on the same directory structure locally
-	os.RemoveAll(resource)
-	pathArr := strings.Split(resource, "/")
+	pathArr := strings.Split(uniqueFileName, "/")
 	directory := ""
 	for _, pathItem := range pathArr[0 : len(pathArr)-1] {
 		directory += pathItem + "/"
@@ -117,7 +140,7 @@ func getKeptnResource(myKeptn *keptn.Keptn, resource string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resourceFile, err := os.Create(resource)
+	resourceFile, err := os.Create(uniqueFileName)
 	if err != nil {
 		myKeptn.Logger.Error(err.Error())
 		return "", err
@@ -132,18 +155,37 @@ func getKeptnResource(myKeptn *keptn.Keptn, resource string) (string, error) {
 	}
 
 	// if the downloaded file is a shell script we also change the permissions
-	if strings.HasSuffix(resource, ".sh") {
+	if strings.HasSuffix(uniqueFileName, ".sh") {
 		os.Chmod(resource, 0777)
 	}
 
-	return resource, nil
+	return uniqueFileName, nil
 }
 
 /**
  * Retrieves a resource (=file) from the local file system. Basically checks if the file is available and if so returns it
  */
-func _getKeptnResourceFromLocal(resource string) (string, error) {
+func _getKeptnResourceFromLocal(resource string, uniqueFileName string) (string, error) {
 	if _, err := os.Stat(resource); err == nil {
+		source, err := os.Open(resource)
+		if err != nil {
+			return resource, err
+		}
+		defer source.Close()
+
+		// lets copy it in case we have a uniqueFilePrefix
+		if strings.Compare(resource, uniqueFileName) != 0 {
+			destination, err := os.Create(uniqueFileName)
+			if err != nil {
+				return "", err
+			}
+
+			defer destination.Close()
+			_, err = io.Copy(destination, source)
+
+			return uniqueFileName, err
+		}
+
 		return resource, nil
 	} else {
 		return "", err
