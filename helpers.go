@@ -156,7 +156,7 @@ func getKeptnResource(myKeptn *keptn.Keptn, resource string, uniqueFilePrefix st
 
 	// if the downloaded file is a shell script we also change the permissions
 	if strings.HasSuffix(uniqueFileName, ".sh") {
-		os.Chmod(resource, 0777)
+		os.Chmod(uniqueFileName, 0777)
 	}
 
 	return uniqueFileName, nil
