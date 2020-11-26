@@ -57,7 +57,7 @@ spec:
       serviceAccountName: generic-executor-service
       containers:
         - name: generic-executor-service
-          image: grabnerandi/generic-executor-service:0.2
+          image: grabnerandi/generic-executor-service:0.3
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	keptn "github.com/keptn/go-utils/pkg/lib"
@@ -230,9 +232,138 @@ func _executeScriptOrHttEventHandler(myKeptn *keptn.Keptn, keptnEvent BaseKeptnE
 
 /**
  * Analyzes the response payload and e.g: sends a keptn event, raise an error, ...
- * TODO: define what payload can contain
- */
-func handleScriptResponsePayload(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, responsePayload string) error {
+ * Here are two examples
+   #1: Just an error that will be logged as an error and in the future maybe sent to keptn as an error event
+   {
+	   "error" : "errormessage"
+   }
+
+   #2: This will instruct Keptn to send a specific event including the necessary metadata which will be merged with other defaults, e.g: project, stage, service, incoming labels ...
+   {
+	   "type" : "sh.keptn.events.tests-finished",
+	   "data" : {
+		   "start" : "2020-11-19T16:41:00Z",
+		   "result" : "pass",
+		   "labels" : {
+			   "TestReportLink" : "https://mytestingtoolreport"
+		   }
+	   }
+   }
+*/
+func handleScriptResponsePayload(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, incomingEvent cloudevents.Event, responsePayload string) error {
+
+	// no payload or not json?
+	if responsePayload == "" || !strings.HasPrefix(responsePayload, "{") {
+		return nil
+	}
+
+	var parsedResponse map[string]interface{}
+	err := json.Unmarshal([]byte(responsePayload), &parsedResponse)
+	if err != nil {
+		return err
+	}
+
+	// Check for error
+	if errorValue, errorOk := parsedResponse["error"]; errorOk {
+		return errors.New(errorValue.(string))
+	}
+
+	// Check for event - if one is specified we send that event to Keptn
+	if typeValue, typeOk := parsedResponse["type"]; typeOk {
+
+		// Handle labels as they are used for all events
+		var newLabels map[string]string
+		if labels, labelsOk := parsedResponse["labels"]; labelsOk {
+			newLabels = labels.(map[string]string)
+		}
+
+		if typeValue == keptn.DeploymentFinishedEventType {
+			deployFinishEventData := &keptn.DeploymentFinishedEventData{}
+			err := incomingEvent.DataAs(deployFinishEventData)
+			if err != nil {
+				return err
+			}
+
+			if testStrategy, testStrategyOk := parsedResponse["teststrategy"]; testStrategyOk {
+				deployFinishEventData.TestStrategy = testStrategy.(string)
+			}
+
+			if deploymentStrategy, deploymentStrategyOk := parsedResponse["deploymentstrategy"]; deploymentStrategyOk {
+				deployFinishEventData.DeploymentStrategy = deploymentStrategy.(string)
+			}
+
+			if deploymentURILocal, deploymentURILocalOk := parsedResponse["deploymentURILocal"]; deploymentURILocalOk {
+				deployFinishEventData.DeploymentURILocal = deploymentURILocal.(string)
+			}
+
+			if deploymentURIPublic, deploymentURIPublicOk := parsedResponse["deploymentURIPublic"]; deploymentURIPublicOk {
+				deployFinishEventData.DeploymentURIPublic = deploymentURIPublic.(string)
+			}
+
+			eventSource := "generic-executor-service"
+			if source, sourceOk := parsedResponse["source"]; sourceOk {
+				eventSource = source.(string)
+			}
+
+			for k, v := range newLabels {
+				deployFinishEventData.Labels[k] = v
+			}
+
+			myKeptn.SendDeploymentFinishedEvent(&incomingEvent,
+				deployFinishEventData.TestStrategy,
+				deployFinishEventData.DeploymentStrategy,
+				deployFinishEventData.Image,
+				deployFinishEventData.Tag,
+				deployFinishEventData.DeploymentURILocal,
+				deployFinishEventData.DeploymentURIPublic,
+				deployFinishEventData.Labels, eventSource)
+
+		} else if typeValue == keptn.TestsFinishedEventType {
+			testFinishEventData := &keptn.TestsFinishedEventData{}
+			err := incomingEvent.DataAs(testFinishEventData)
+			if err != nil {
+				return err
+			}
+
+			if testStrategy, testStrategyOk := parsedResponse["teststrategy"]; testStrategyOk {
+				testFinishEventData.TestStrategy = testStrategy.(string)
+			}
+
+			if deploymentStrategy, deploymentStrategyOk := parsedResponse["deploymentstrategy"]; deploymentStrategyOk {
+				testFinishEventData.DeploymentStrategy = deploymentStrategy.(string)
+			}
+
+			if start, startOk := parsedResponse["start"]; startOk {
+				testFinishEventData.Start = start.(string)
+			}
+
+			if result, resultOk := parsedResponse["result"]; resultOk {
+				testFinishEventData.Result = result.(string)
+			}
+
+			eventSource := "generic-executor-service"
+			if source, sourceOk := parsedResponse["source"]; sourceOk {
+				eventSource = source.(string)
+			}
+
+			// if no start time is passed we use the time from the incoming event
+			startTime, err := time.Parse("2020-11-19T16:41:00Z", testFinishEventData.Start)
+			if err != nil {
+				startTime = incomingEvent.Time()
+			}
+
+			for k, v := range newLabels {
+				testFinishEventData.Labels[k] = v
+			}
+
+			myKeptn.SendTestsFinishedEvent(&incomingEvent,
+				testFinishEventData.TestStrategy,
+				testFinishEventData.DeploymentStrategy,
+				startTime,
+				testFinishEventData.Result,
+				testFinishEventData.Labels, eventSource)
+		}
+	}
 
 	return nil
 }
@@ -291,7 +422,7 @@ func HandleConfigureMonitoringEvent(myKeptn *keptn.Keptn, incomingEvent cloudeve
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, payload)
+	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
 	return err
 }
 
@@ -310,7 +441,7 @@ func HandleConfigurationChangeEvent(myKeptn *keptn.Keptn, incomingEvent cloudeve
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, payload)
+	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
 	return err
 }
 
@@ -335,7 +466,7 @@ func HandleDeploymentFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudeven
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, payload)
+	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
 	return err
 }
 
@@ -358,7 +489,7 @@ func HandleTestsFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Ev
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, payload)
+	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
 	return err
 }
 
@@ -381,7 +512,7 @@ func HandleStartEvaluationEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, payload)
+	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
 	return err
 }
 
@@ -403,7 +534,7 @@ func HandleEvaluationDoneEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.E
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, payload)
+	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
 	return err
 }
 
@@ -503,7 +634,6 @@ func HandleActionTriggeredEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.
 		}
 
 		// STep 3: Send an action finished
-
 		myKeptn.SendActionFinishedEvent(&incomingEvent, actionResult, data.Labels, "generic-executor-service")
 		if err != nil {
 			log.Printf("Got Error From SendActionFinishedEvent: %s", err.Error())
