@@ -73,8 +73,10 @@ Here is a sample folder structure in my Git repo for a specific service and stag
 -- configuration.change.py    <-- executed for configuration.change for all services unless file exists on stage or service level
 ```
 
-The *generic-executor-service* will first execute those files with the name all.events.sh and all.events.http. This gives you the ability to specify one set of action that should be executed for every Keptn event. Good news is that you can also specify these files on a stage or project level. If the *generic-executor-service* doesnt find a file on service level it looks at stage level and then on project. The first that is found will be executed!
-After that the *generic-executor-service* will look for a file called KEPTN-EVENT.sh or KEPTN-EVENT.http where KEPTN-EVENT can be one of the following values corresponding to the Keptn events
+The *generic-executor-service* will first execute those files with the specific Keptn event name, e.g: `configuration.change.sh` or `configuration.change.py`. After that it will execute those with the name `all.events.sh` and `all.events.http` if they exist in the repo. This gives you the ability to specify one set of action that should be executed for every Keptn event (exception here are the action.triggered events - see more information below!). 
+Good news is that you can also specify these files on a stage or project level. If the *generic-executor-service* doesnt find a file on service level it looks at stage level and then on project. The first that is found will be executed!
+
+Here is the list of all event prefixes that you can use for your script names:
 ```
 -- configuration.change.*
 -- deployment.finished.*
@@ -82,10 +84,12 @@ After that the *generic-executor-service* will look for a file called KEPTN-EVEN
 -- start.evaluation.*
 -- evaluation.done.*
 -- problem.open.*
--- action.triggered.*
+-- action.triggered.ACTIONNAME*
 ```
 
 This gives you full flexiblity to provide a bash, python or http script for each event or specify a bash and http script that shoudl be executed for all events.
+
+**ATTENTION:** As mentioned above `action.triggered.*` is treated specially. The *generic-executor-service* only executes the first matching script starting but not all that match, e.g: if it finds `action.triggered.actionname.sh` it WONT execute a script with the name `all.events.sh`. More information on this behavior can be found in the section on auto-remediation below!
 
 Please have a look at the sample .http, .py and .sh files to see how the *generic-executor-service* is not only calling these scripts or making http calls. The service is also passing Keptn Event specific context data such as PROJECT, SERVICE, LABELS and also ENV-Variables of the *generic-executor-service* pod as variables that you can reference. This gives you a lot of flexibility when writing these scripts.
 
@@ -209,6 +213,46 @@ To provide a script for that action you can upload the following filenames:
 
 Besides the environment variables described above this script also gets env-variables passed with the prefix VALUE_ for each value in the values list. In the example above there is one *value* with the name *Message*. To access the value of this you can simply access the environment-variable *VALUE_MESSAGE*
 For a full example check out the script *action.triggered.myaction.py* which you can find in the files subfolder!
+
+### Return Result and Status
+The *generic-executor-servcie* will send a `sh.keptn.event.action.finished` once the script finished execution. That event includes two fields telling Keptn more about the result (pass or fail) and status (optional more detailed description of the result) of that execution.
+
+The *generic-executor-service* will set `result` to `pass` if the script executed with error code 0 or if an HTTP WebHook returned 2xx (200-299). If not - it will return `fail`
+
+As for the `status` field: If the script writes to the console this output will be set in the `status` field allowing you to pass on any type of output back to Keptn and to other services that are listening to the `sh.keptn.event.action.finished` event, e.g.: The *dynatrace-service* will push this as a comment on the problem ticket that triggered the remediation workflow!
+If you are executing an HTTP webhook the response body will be passed in the `status` field!
+If no content is generated then the *generic-executor-service* simply defaults to either `succeeded` or `errored`!
+
+Here is a sample action.finished event sent to Keptn:
+```json
+{
+  "contenttype": "application/json",
+  "data": {
+    "action": {
+      "result": "pass",
+      "status": "This is my poweroutage handler script and I got passed ./tmpdata/2d363636-3537-4030-b031-343135323139.event.json as parameter\nI also have some env variables, e.g: PID=-6665700014152199021, CONTEXT=2d363636-3537-4030-b031-343135323139\nSOURCE=remediation-service\nPROJECT=demo-remediation\nPROBLEMTITLE=Simulated Power outage\nAnd here is the message that was passed as part of the remediation action definition :Please make sure nobody dripped on a cable!\n"
+    },
+    "labels": {
+      "Problem URL": "https://abc1234.live.dynatrace.com/#problems/problemdetails;pid=-6665700014152199021_1606338043710V2",
+      "poweroutageaction": "action.triggered.poweroutageaction.py"
+    },
+    "project": "demo-remediation",
+    "service": "allproblems",
+    "stage": "production"
+  },
+  "id": "6187a43a-7112-4cd8-a4d1-1dcc3b5d11c1",
+  "source": "generic-executor-service",
+  "specversion": "0.2",
+  "time": "2020-11-25T21:04:01.832Z",
+  "type": "sh.keptn.event.action.finished",
+  "shkeptncontext": "2d363636-3537-4030-b031-343135323139"
+}
+```
+
+And here a screenshot of the Dynatrace problem showing result and status as part of the comment:
+![](./images/dynatrace_problem_comment.png)
+
+All the best with using this for auto-remediation workflows!
 
 
 ## Development
