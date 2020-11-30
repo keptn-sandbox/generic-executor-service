@@ -52,6 +52,7 @@ ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python
 RUN python3 -m ensurepip
 RUN pip3 install --no-cache --upgrade pip setuptools
+RUN pip3 install requests
 
 # Copy the binary to the production image from the builder stage.
 COPY --from=builder /src/generic-executor-service/generic-executor-service /generic-executor-service
