@@ -14,6 +14,7 @@ This implements a generic-executor-service for Keptn.
 |:----------------:|:----------------------------------------:|
 |       0.6.1      | grabnerandi/generic-executor-service:latest |
 |       0.7.x      | grabnerandi/generic-executor-service:0.2 |
+|       0.7.x      | grabnerandi/generic-executor-service:0.3 |
 
 ## Installation
 
@@ -140,7 +141,10 @@ echo "TestToken = $ENV_TESTTOKEN"
 ```
 
 ### Sample Python Script
-And here a sample python script that the *generic-executor-service* is calling by setting all the Keptn context, labels and container environment variables as environment variables for this script:
+
+For Python please be aware the the *generic-executor-service* container comes with a Python3 runtime and also an installed `requests` module. Any other depending modules are not installed. If you need them either file an issue so we can include them in future builds or simply fork this repository and build your own customized version by installing any additional modules in the Dockerfile:
+
+Here a sample python script that the *generic-executor-service* is calling by setting all the Keptn context, labels and container environment variables as environment variables for this script:
 ```python
 action.triggered.myaction.py:
 import os
@@ -182,6 +186,39 @@ $ENV_YOURCUSTOMENV,$ENV_KEPTN_API_TOKEN,$ENV_KEPTN_ENDPOINT,...
 ### Event file passed as parameter
 
 You may have seen it in the python example. The *generic-exectutor-service* is also passing the full Keptn Event that triggered that execution as script argument. The first parameter is the reference to that filename. This gives you full access to the raw Keptn CloudEvent.
+
+### Returning errors or follow up event
+
+The *generic-executor-service* is analyzing the output of the script. In general it allows any type of output which will then be logged out to the console.
+It also allows however for some special output allowing you to return an error message in case of an error or allowing you to send a Keptn event as a follow up to your script.
+
+**1: Return error details**
+
+The following is an output example that indicates that the script ran into an error and it gives a more clear error message:
+```json
+{
+  "error" : "errormessage"
+}
+```
+
+**2: Return Keptn Event**
+
+Your scripts can also return a Keptn Cloud Event as JSON which will then be used by the *generic-executor-service* and sent as a Keptn Event back to Keptn. This allows you to e.g: write a script that handles a configuration-change event and then sends the *deployment-finished* event. Or you could write your own script that handles a *deployment-finished* event by then executing some tests. Once the tests are done your script can send a *test-finished* event
+
+```json
+{
+  "type" : "sh.keptn.events.tests-finished",
+  "data" : {
+    "start" : "2020-11-19T16:41:00Z",
+    "result" : "pass",
+    "labels" : {
+      "TestReportLink" : "https://mytestingtoolreport"
+    }
+  }
+}
+```
+
+Currently the *generic-executor-service* supports the events `sh.keptn.events.tests-finished` and `sh.keptn.events.deployment-finished`. More will follow
 
 Enjoy the fun!
 
