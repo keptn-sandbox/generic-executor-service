@@ -2,19 +2,19 @@
 
 This is a Sandbox Keptn Service that enables generic execution of bash files, Python3 and HTTP requests for individual Keptn Events 
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/grabnerandi/generic-executor-service)
-[![Build Status](https://travis-ci.org/grabnerandi/generic-executor-service.svg?branch=master)](https://travis-ci.org/grabnerandi/generic-executor-service)
-[![Go Report Card](https://goreportcard.com/badge/github.com/grabnerandi/generic-executor-service)](https://goreportcard.com/report/github.com/grabnerandi/generic-executor-service)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/keptn-sandbox/generic-executor-service)
+[![Build Status](https://travis-ci.org/keptn-sandbox/generic-executor-service.svg?branch=master)](https://travis-ci.org/keptn-sandbox/generic-executor-service)
+[![Go Report Card](https://goreportcard.com/badge/github.com/keptn-sandbox/generic-executor-service)](https://goreportcard.com/report/github.com/keptn-sandbox/generic-executor-service)
 
 This implements a generic-executor-service for Keptn.
 
 ## Compatibility Matrix
 
-| Keptn Version    | [Generic Executor Service for Keptn](https://hub.docker.com/r/grabnerandi/generic-executor-service/tags) |
+| Keptn Version    | [Generic Executor Service for Keptn](https://hub.docker.com/r/keptnsandbox/generic-executor-service/tags) |
 |:----------------:|:----------------------------------------:|
 |       0.6.1      | grabnerandi/generic-executor-service:latest |
 |       0.7.x      | grabnerandi/generic-executor-service:0.2 |
-|       0.7.x      | grabnerandi/generic-executor-service:0.3 |
+|       0.7.3      | keptnsandbox/generic-executor-service:0.3 |
 
 ## Installation
 
