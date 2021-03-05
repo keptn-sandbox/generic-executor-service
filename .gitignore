@@ -15,6 +15,15 @@ tmpdata/*
 vendor/*
 .DS_Store
 
+# IDE specific folders
+.vscode
+
+# only ignore contents of local .idea
+.idea/*
+# but allow .idea shared run configurations
+!.idea/runConfigurations/
+
+
 #binary - go build
 generic-executor-service
 main

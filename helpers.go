@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,56 +11,9 @@ import (
 	"os/exec"
 	"strings"
 
-	api "github.com/keptn/go-utils/pkg/api/utils"
-	keptn "github.com/keptn/go-utils/pkg/lib"
+	cloudevents "github.com/cloudevents/sdk-go/v2" // make sure to use v2 cloudevents here
+	keptnv2 "github.com/keptn/go-utils/pkg/lib/v0_2_0"
 )
-
-/**
- * Structs
- */
-
-type BaseKeptnEvent struct {
-	// context, source and eventid
-	context   string
-	source    string
-	event     string
-	time      string
-	timeutc   string
-	timeutcms string
-
-	// project & deployment specific
-	project      string
-	stage        string
-	service      string
-	deployment   string
-	testStrategy string
-
-	// test specific
-	testStart string
-	testEnd   string
-
-	// evaluation specific
-	evaluationStart  string
-	evaluationEnd    string
-	evaluationResult string
-
-	// only filled for deployment events
-	tag                 string
-	image               string
-	deploymentURILocal  string
-	deploymentURIPublic string
-
-	// action & problem specific
-	action       string
-	problemState string
-	problemID    string
-	problemTitle string
-	pid          string
-	problemURL   string
-
-	labels            map[string]string
-	remediationValues map[string]string
-}
 
 type genericHttpRequest struct {
 	method  string
@@ -70,54 +22,37 @@ type genericHttpRequest struct {
 	body    string
 }
 
-var KeptnOptions = keptn.KeptnOpts{}
-
 /**
  * Removes the list of files
  */
-func removeFiles(myKeptn *keptn.Keptn, filesToRemove []string) {
+func removeFiles(filesToRemove []string) {
 
 	for _, fileName := range filesToRemove {
 
 		err := os.Remove(fileName)
 		if err != nil {
-			myKeptn.Logger.Error(err.Error())
+			log.Printf("Error removing file: %s", err.Error())
 		}
 	}
 }
 
 /**
- * Retrieves a resource (=file) from the keptn configuration repo and stores it in the local file system
+ * Retrieves a resource (=file) from the keptn configuration repo and returns its content
  */
-func getKeptnResource(myKeptn *keptn.Keptn, resource string, uniqueFilePrefix string) (string, error) {
-
-	// we create our uniqueFileName with the prefix
-	// here some examples on what that looks like
-	// myfile.txt -> PREFIX_myfile.txt
-	// folder/myfile.txt -> folder/PREFIX_myfile.txt
-	uniqueFileName := strings.Replace(resource, "/", "/"+uniqueFilePrefix+"_", 1)
-	if uniqueFilePrefix != "" {
-		os.RemoveAll(uniqueFileName)
-	}
-
-	// if we run in a runlocal mode we are just getting the file from the local disk
-	if KeptnOptions.UseLocalFileSystem {
-		return _getKeptnResourceFromLocal(resource, uniqueFileName)
-	}
-
-	resourceHandler := api.NewResourceHandler(KeptnOptions.ConfigurationServiceURL)
+func getKeptnResource(myKeptn *keptnv2.Keptn, resource string, uniquePrefix string) (string, error) {
+	resourceHandler := myKeptn.ResourceHandler
 
 	// SERVICE-LEVEL: lets try to find it on service level
-	requestedResource, err := resourceHandler.GetServiceResource(myKeptn.KeptnBase.Project, myKeptn.KeptnBase.Stage, myKeptn.KeptnBase.Service, resource)
+	requestedResource, err := resourceHandler.GetServiceResource(myKeptn.Event.GetProject(), myKeptn.Event.GetStage(), myKeptn.Event.GetService(), resource)
+
 	if err != nil || requestedResource.ResourceContent == "" {
 		// STAGE-LEVEL: not found on service level - lets search one level up on stage level
-		requestedResource, err = resourceHandler.GetStageResource(myKeptn.KeptnBase.Project, myKeptn.KeptnBase.Stage, resource)
+		requestedResource, err = resourceHandler.GetStageResource(myKeptn.Event.GetProject(), myKeptn.Event.GetStage(), resource)
 		if err != nil || requestedResource.ResourceContent == "" {
 			// PROJECT-LEVEL: not found on the stage level - lets search one level up on project level
-			requestedResource, err = resourceHandler.GetProjectResource(myKeptn.KeptnBase.Project, resource)
+			requestedResource, err = resourceHandler.GetProjectResource(myKeptn.Event.GetProject(), resource)
 
 			if err != nil || requestedResource.ResourceContent == "" {
-				// myKeptn.Logger.Debug(fmt.Sprintf("Keptn Resource not found or empty: %s/%s/%s/%s - %s", myKeptn.KeptnBase.Project, myKeptn.KeptnBase.Stage, myKeptn.KeptnBase.Service, resource, err))
 				return "", err
 			}
 
@@ -129,20 +64,25 @@ func getKeptnResource(myKeptn *keptn.Keptn, resource string, uniqueFilePrefix st
 		myKeptn.Logger.Debug("Found " + resource + " on service level")
 	}
 
+	targetFileName := fmt.Sprintf("%s/%s", uniquePrefix, resource)
+
 	// now store that file on the same directory structure locally
-	pathArr := strings.Split(uniqueFileName, "/")
+	os.RemoveAll(targetFileName)
+	pathArr := strings.Split(targetFileName, "/")
 	directory := ""
 	for _, pathItem := range pathArr[0 : len(pathArr)-1] {
 		directory += pathItem + "/"
 	}
 
-	err = os.MkdirAll(directory, os.ModePerm)
-	if err != nil {
-		return "", err
+	if directory != "" {
+		err = os.MkdirAll(directory, os.ModePerm)
+		if err != nil {
+			return "", err
+		}
 	}
-	resourceFile, err := os.Create(uniqueFileName)
+	resourceFile, err := os.Create(targetFileName)
 	if err != nil {
-		myKeptn.Logger.Error(err.Error())
+		fmt.Errorf(err.Error())
 		return "", err
 	}
 	defer resourceFile.Close()
@@ -150,46 +90,11 @@ func getKeptnResource(myKeptn *keptn.Keptn, resource string, uniqueFilePrefix st
 	_, err = resourceFile.Write([]byte(requestedResource.ResourceContent))
 
 	if err != nil {
-		myKeptn.Logger.Error(err.Error())
+		fmt.Errorf(err.Error())
 		return "", err
 	}
 
-	// if the downloaded file is a shell script we also change the permissions
-	if strings.HasSuffix(uniqueFileName, ".sh") {
-		os.Chmod(uniqueFileName, 0777)
-	}
-
-	return uniqueFileName, nil
-}
-
-/**
- * Retrieves a resource (=file) from the local file system. Basically checks if the file is available and if so returns it
- */
-func _getKeptnResourceFromLocal(resource string, uniqueFileName string) (string, error) {
-	if _, err := os.Stat(resource); err == nil {
-		source, err := os.Open(resource)
-		if err != nil {
-			return resource, err
-		}
-		defer source.Close()
-
-		// lets copy it in case we have a uniqueFilePrefix
-		if strings.Compare(resource, uniqueFileName) != 0 {
-			destination, err := os.Create(uniqueFileName)
-			if err != nil {
-				return "", err
-			}
-
-			defer destination.Close()
-			_, err = io.Copy(destination, source)
-
-			return uniqueFileName, err
-		}
-
-		return resource, nil
-	} else {
-		return "", err
-	}
+	return targetFileName, nil
 }
 
 //
@@ -203,52 +108,18 @@ func _getKeptnResourceFromLocal(resource string, uniqueFileName string) (string,
 // $ENV.XXXX    -> will replace that with an env variable called XXXX
 // $SECRET.YYYY -> will replace that with the k8s secret called YYYY
 //
-func replaceKeptnPlaceholders(input string, keptnEvent BaseKeptnEvent) string {
+func replaceKeptnPlaceholders(input string, incomingEvent cloudevents.Event) string {
 	result := input
 
+	// ToDo: This needs to be refactored to replace anything that appears in the cloudevent
+
 	// first we do the regular keptn values
-	result = strings.Replace(result, "$TIMESTRING", keptnEvent.time, -1)
-	result = strings.Replace(result, "$TIMEUTCSTRING", keptnEvent.timeutc, -1)
-	result = strings.Replace(result, "$TIMEUTCMS", keptnEvent.timeutcms, -1)
-
-	result = strings.Replace(result, "$CONTEXT", keptnEvent.context, -1)
-	result = strings.Replace(result, "$EVENT", keptnEvent.event, -1)
-	result = strings.Replace(result, "$SOURCE", keptnEvent.source, -1)
-
-	result = strings.Replace(result, "$PROJECT", keptnEvent.project, -1)
-	result = strings.Replace(result, "$STAGE", keptnEvent.stage, -1)
-	result = strings.Replace(result, "$SERVICE", keptnEvent.service, -1)
-	result = strings.Replace(result, "$DEPLOYMENT", keptnEvent.deployment, -1)
-	result = strings.Replace(result, "$TESTSTRATEGY", keptnEvent.testStrategy, -1)
-
-	result = strings.Replace(result, "$DEPLOYMENTURILOCAL", keptnEvent.deploymentURILocal, -1)
-	result = strings.Replace(result, "$DEPLOYMENTURIPUBLIC", keptnEvent.deploymentURIPublic, -1)
-
-	result = strings.Replace(result, "$ACTION", keptnEvent.action, -1)
-
-	result = strings.Replace(result, "$PROBLEMID", keptnEvent.problemID, -1)
-	result = strings.Replace(result, "$PROBLEMSTATE", keptnEvent.problemState, -1)
-	result = strings.Replace(result, "$PID", keptnEvent.pid, -1)
-	result = strings.Replace(result, "$PROBLEMTITLE", keptnEvent.problemTitle, -1)
-	result = strings.Replace(result, "$PROBLEMURL", keptnEvent.problemURL, -1)
-
-	// now we do the labels
-	for key, value := range keptnEvent.labels {
-		result = strings.Replace(result, "$LABEL_"+strings.ToUpper(key), value, -1)
-	}
-
-	// now we do the remediation values
-	for remediationKey, remediationValue := range keptnEvent.remediationValues {
-		result = strings.Replace(result, "$VALUE_"+strings.ToUpper(remediationKey), remediationValue, -1)
-	}
 
 	// now we do all environment variables
-	for _, env := range os.Environ() {
-		pair := strings.SplitN(env, "=", 2)
-		result = strings.Replace(result, "$ENV_"+strings.ToUpper(pair[0]), pair[1], -1)
-	}
+	// TODO: This is mega dangerous, this allows leaking of any environment variable, e.g., Api Tokens of Keptn/Kubernetes
 
 	// TODO: iterate through k8s secrets!
+	// ToDo: This is also mega dangerous, don't do this
 
 	return result
 }
@@ -287,7 +158,7 @@ func _nextCleanLine(lines []string, lineIx int, trim bool) (int, string) {
 //
 // Parses .http raw file content and returns HTTP METHOD, URI, HEADERS, BODY
 //
-func parseHttpRequestFromHttpTextFile(keptnEvent BaseKeptnEvent, httpfile string) (genericHttpRequest, error) {
+func parseHttpRequestFromHttpTextFile(httpfile string, incomingEvent cloudevents.Event) (genericHttpRequest, error) {
 	var returnRequest genericHttpRequest
 
 	content, err := ioutil.ReadFile(httpfile)
@@ -295,17 +166,17 @@ func parseHttpRequestFromHttpTextFile(keptnEvent BaseKeptnEvent, httpfile string
 		return returnRequest, err
 	}
 
-	return parseHttpRequestFromString(string(content), keptnEvent)
+	return parseHttpRequestFromString(string(content), incomingEvent)
 }
 
 //
 // Parses .http string content and returns HTTP METHOD, URI, HEADERS, BODY
 //
-func parseHttpRequestFromString(rawContent string, keptnEvent BaseKeptnEvent) (genericHttpRequest, error) {
+func parseHttpRequestFromString(rawContent string, incomingEvent cloudevents.Event) (genericHttpRequest, error) {
 	var returnRequest genericHttpRequest
 
 	// lets first replace all Keptn related placeholders
-	rawContent = replaceKeptnPlaceholders(rawContent, keptnEvent)
+	rawContent = replaceKeptnPlaceholders(rawContent, incomingEvent)
 
 	// lets get each line
 	lines := strings.Split(rawContent, "\n")
@@ -385,59 +256,6 @@ func executeGenericHttpRequest(request genericHttpRequest) (int, string, error) 
 	body, err := ioutil.ReadAll(resp.Body)
 
 	return resp.StatusCode, string(body), err
-}
-
-func executeCommandWithKeptnContext(command string, args []string, keptnEvent BaseKeptnEvent, directory *string) (string, error) {
-	// build the map of environment variables
-
-	// first we build our core keptn values
-	keptnEnvs := []string{
-		"TIMESTRING=" + keptnEvent.time,
-		"TIMEUTCSTRING=" + keptnEvent.timeutc,
-		"TIMEUTCMS=" + keptnEvent.timeutcms,
-		"CONTEXT=" + keptnEvent.context,
-		"EVENT=" + keptnEvent.event,
-		"SOURCE=" + keptnEvent.source,
-		"PROJECT=" + keptnEvent.project,
-		"SERVICE=" + keptnEvent.service,
-		"STAGE=" + keptnEvent.stage,
-		"DEPLOYMENT=" + keptnEvent.deployment,
-		"TESTSTRATEGY=" + keptnEvent.testStrategy,
-		"DEPLOYMENTURILOCAL=" + keptnEvent.deploymentURILocal,
-		"DEPLOYMENTURIPUBLIC=" + keptnEvent.deploymentURIPublic,
-		"ACTION=" + keptnEvent.action,
-		"PROBLEMID=" + keptnEvent.problemID,
-		"PROBLEMSTATE=" + keptnEvent.problemState,
-		"PID=" + keptnEvent.pid,
-		"PROBLEMTITLE=" + keptnEvent.problemTitle,
-		"PROBLEMURL=" + keptnEvent.problemURL,
-	}
-
-	// we combine the environment variables of our running process with all those with labels
-	// those from our local process are prefixed with ENV_ , e.g: ENV_PROCESSENV=abcd
-	// those coming from labels are prefixed with LABEL_, e.g: LABEL_MYLABEL=abcd
-	localEnvs := os.Environ()
-	commandEnvs := make([]string, len(keptnEnvs)+len(localEnvs)+len(keptnEvent.labels)+len(keptnEvent.remediationValues))
-	var envIx = 0
-	for _, env := range keptnEnvs {
-		commandEnvs[envIx] = env
-		envIx++
-	}
-	for _, env := range localEnvs {
-		commandEnvs[envIx] = "ENV_" + strings.ToUpper(env)
-		envIx++
-	}
-	for key, value := range keptnEvent.labels {
-		commandEnvs[envIx] = "LABEL_" + strings.ToUpper(key) + "=" + value
-		envIx++
-	}
-	// now we do the remediation values
-	for remediationKey, remediationValue := range keptnEvent.remediationValues {
-		commandEnvs[envIx] = "VALUE_" + strings.ToUpper(remediationKey) + "=" + remediationValue
-		envIx++
-	}
-
-	return executeCommand(command, args, commandEnvs, directory)
 }
 
 //

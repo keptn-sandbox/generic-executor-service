@@ -6,32 +6,39 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
-	"time"
 
-	"github.com/cloudevents/sdk-go/pkg/cloudevents"
-	keptn "github.com/keptn/go-utils/pkg/lib"
+	cloudevents "github.com/cloudevents/sdk-go/v2" // make sure to use v2 cloudevents here
+	keptnv2 "github.com/keptn/go-utils/pkg/lib/v0_2_0"
 )
 
 // GenericScriptFolderBase Folder in the Keptn GitHub Repo where we expect scripts and http files
 const GenericScriptFolderBase = "generic-executor/"
 
-/**
-* Here are all the handler functions for the individual events
-  -> "sh.keptn.event.configuration.change"
-  -> "sh.keptn.events.deployment-finished"
-  -> "sh.keptn.events.tests-finished"
-  -> "sh.keptn.event.start-evaluation"
-  -> "sh.keptn.events.evaluation-done"
-  -> "sh.keptn.event.problem.open"
-  -> "sh.keptn.events.problem"
-*/
+func findAndStoreScriptFile(myKeptn *keptnv2.Keptn, filePrefix string, uniquePrefix string) (string, error) {
+	// we allow different files to be specified by the end user - we first look for the more specific ones that include the file name
+	allowedFilenames := []string{
+		GenericScriptFolderBase + filePrefix + ".sh",
+		GenericScriptFolderBase + filePrefix + ".py",
+		GenericScriptFolderBase + filePrefix + ".http",
+		GenericScriptFolderBase + "all.events.sh",
+		GenericScriptFolderBase + "all.events.py",
+		GenericScriptFolderBase + "all.events.http",
+	}
 
-const EXECUTESTATUS_NOACTIONFOUND = 0
-const EXECUTESTATUS_SUCCESSFULL = 1
-const EXECUTESTATUS_FAILED = 2
-const EXECUTESTATUS_ACTIONFOUND = 3
+	// iterate over all files in that order
+	for _, filename := range allowedFilenames {
+		resourceFilename, err := getKeptnResource(myKeptn, filename, uniquePrefix)
+
+		if resourceFilename != "" && err == nil {
+			log.Printf("Found script %s and stored it as %s", filename, resourceFilename)
+
+			return resourceFilename, nil
+		}
+	}
+
+	return "", fmt.Errorf("No file found")
+}
 
 /**
  * executeScriptOrHTTP
@@ -54,592 +61,194 @@ const EXECUTESTATUS_ACTIONFOUND = 3
 // if any of the passed files exist either executes the bash or the http request
 // The return status depends on the success of the executed script or HTTP Request. If the script fails or if the HTTP call returns a status code >= 300 the call is considered failed
 //
-func executeScriptOrHTTP(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data interface{}, bashFilenames, httpFilenames []string, args []string, executeIfExists bool, onlyFirstMatch bool) (int, string, string, error) {
+func executeScriptOrHTTP(scriptFileName string, incomingEvent cloudevents.Event) (string, keptnv2.ResultType, keptnv2.StatusType, error) {
 
-	returnStatus := EXECUTESTATUS_NOACTIONFOUND
-	var returnError error
-	executedScript := ""
-	returnPayload := ""
+	if strings.HasSuffix(scriptFileName, ".http") {
+		// Execute HTTP Test
+		parsedRequest, err := parseHttpRequestFromHttpTextFile(scriptFileName, incomingEvent)
 
-	// we will prefix any downloaded file with the keptn context to make sure we dont have any colisions
-	uniqueFilePrefix := keptnEvent.context
-
-	// lets start with the bashfiles
-	for _, bashFilename := range bashFilenames {
-		resource, err := getKeptnResource(myKeptn, bashFilename, uniqueFilePrefix)
-		if resource != "" && err == nil {
-			myKeptn.Logger.Debug("Found script " + bashFilename)
-
-			executedScript = bashFilename
-			// if we are just here to see whether we found something to execute then lets return this status
-			if !executeIfExists {
-				removeFiles(myKeptn, []string{resource})
-				return EXECUTESTATUS_ACTIONFOUND, executedScript, returnPayload, nil
-			}
-
-			// if this is a python script our command is actually python3 and we pass the script as an argument
-			argsToUse := args
-			executable := resource
-			if strings.Index(bashFilename, ".py") > 0 {
-				argsToUse = append([]string{resource}, args...)
-				executable = "python3"
-			}
-
-			// Lets execute it
-			var output string
-			output, err = executeCommandWithKeptnContext(executable, argsToUse, keptnEvent, nil)
-			if err != nil {
-				myKeptn.Logger.Error(fmt.Sprintf("Error executing script: %s", err.Error()))
-				returnStatus = EXECUTESTATUS_FAILED
-				returnError = err
-			} else {
-				myKeptn.Logger.Info("Script output: " + output)
-				returnPayload = output
-				returnStatus = EXECUTESTATUS_SUCCESSFULL
-				returnError = nil
-			}
-
-			// lets make sure remove that file again after we executed it
-			removeFiles(myKeptn, []string{resource})
-
-			// only first match?
-			if onlyFirstMatch {
-				return returnStatus, executedScript, returnPayload, returnError
-			}
-
-		} else {
-			myKeptn.Logger.Debug("No script found at " + bashFilename)
-			if err != nil {
-				myKeptn.Logger.Debug("err " + err.Error())
-			}
-		}
-	}
-
-	// now we iterate through the http files
-	for _, httpFilename := range httpFilenames {
-		var parsedRequest genericHttpRequest
-		resource, err := getKeptnResource(myKeptn, httpFilename, uniqueFilePrefix)
-		if resource != "" && err == nil {
-			myKeptn.Logger.Debug("Found http request " + httpFilename)
-
-			executedScript = httpFilename
-
-			// if we are just here to see whether we found something to execute then lets return this status
-			if !executeIfExists {
-				removeFiles(myKeptn, []string{resource})
-				return EXECUTESTATUS_ACTIONFOUND, executedScript, returnPayload, nil
-			}
-
-			// Lets execute it
-			parsedRequest, err = parseHttpRequestFromHttpTextFile(keptnEvent, httpFilename)
-			if err == nil {
-				statusCode, body, requestError := executeGenericHttpRequest(parsedRequest)
-				if requestError != nil {
-					myKeptn.Logger.Error(fmt.Sprintf("Error: %s", requestError.Error()))
-					returnStatus = EXECUTESTATUS_FAILED
-					returnError = requestError
-				} else {
-					returnPayload = body
-					if statusCode <= 299 {
-						returnStatus = EXECUTESTATUS_SUCCESSFULL
-					} else {
-						returnStatus = EXECUTESTATUS_FAILED
-						returnError = fmt.Errorf("HTTP Call returned status code: %d", statusCode)
-					}
-					myKeptn.Logger.Info(fmt.Sprintf("%d - %s", statusCode, body))
-				}
-			} else {
-				myKeptn.Logger.Error(fmt.Sprintf("Error: %s", err.Error()))
-				returnStatus = EXECUTESTATUS_FAILED
-			}
-
-			// lets make sure remove that file again after we executed it
-			removeFiles(myKeptn, []string{resource})
-
-			// only first match?
-			if onlyFirstMatch {
-				return returnStatus, executedScript, returnPayload, returnError
-			}
-		} else {
-			myKeptn.Logger.Debug("No http file found at " + httpFilename)
-		}
-	}
-
-	return returnStatus, executedScript, returnPayload, returnError
-}
-
-/*
-* Please see documentation of executeScriptOrHTTP as this method calls executeScriptOrHTTP with a list of files it should look for in the config repo
-* Return:
-* int: status, e.g: EXECUTESTATUS_XXX
-* string: name of the first matched script
-* string: return payload
-* error: any error that may have occured
- */
-func _executeScriptOrHttEventHandler(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, data interface{}, filePrefix string, executeIfExists bool, onlyFirstMatch bool) (int, string, string, error) {
-	// we allow different files to be specified by the end user - we first look for the more specific ones that include the file name
-	bashFilenames := []string{
-		GenericScriptFolderBase + filePrefix + ".sh",
-		GenericScriptFolderBase + filePrefix + ".py",
-		GenericScriptFolderBase + "all.events.sh",
-		GenericScriptFolderBase + "all.events.py",
-	}
-
-	httpFilenames := []string{
-		GenericScriptFolderBase + filePrefix + ".http",
-		GenericScriptFolderBase + "all.events.http",
-	}
-
-	//
-	// First - lets store the event as a json file on the filesystem as we are passing it to the script as an argument
-	eventJsonPath := "./tmpdata/"
-	eventJsonFileName := eventJsonPath + keptnEvent.context + ".event.json"
-	dataAsJson, err := json.Marshal(data)
-	if err == nil {
-
-		if _, err := os.Stat(eventJsonFileName); os.IsNotExist(err) {
-			os.MkdirAll(eventJsonPath, 0700)
+		if err != nil {
+			return "", keptnv2.ResultFailed, keptnv2.StatusErrored, fmt.Errorf("Failed to parse %s: %s", scriptFileName, err.Error())
 		}
 
-		file, err := os.Create(eventJsonFileName)
-		if err == nil {
-			file.Write(dataAsJson)
-			defer file.Close()
-		} else {
-			myKeptn.Logger.Error(fmt.Sprintf("Couldnt write %s: %s", eventJsonFileName, err.Error()))
+		statusCode, body, requestError := executeGenericHttpRequest(parsedRequest)
+
+		if requestError != nil {
+			// request errored
+			return "", keptnv2.ResultFailed, keptnv2.StatusErrored, requestError
 		}
-	} else {
-		myKeptn.Logger.Error(fmt.Sprintf("Couldnt marshal incoming event to JSON string: %s", err.Error()))
+		if statusCode >= 200 && statusCode <= 299 {
+			// http status 2xx is suggesting that everything is fine
+			return body, keptnv2.ResultPass, keptnv2.StatusSucceeded, nil
+		}
+
+		// last but not least: status code != 2xx suggests that something went wrong on the other side
+		log.Printf("HTTP Call returned status code %d", statusCode)
+		return body, keptnv2.ResultFailed, keptnv2.StatusSucceeded, nil
 	}
+	// else: execute the script using bash or python
 
-	// pass the event filename as argument
-	args := []string{eventJsonFileName}
+	// store event in file
+	eventJSONFileName, err := storeCloudEventInFile(incomingEvent)
 
-	// now lets execute these scripts!
-	status, scriptName, responsePayload, err := executeScriptOrHTTP(myKeptn, keptnEvent, data, bashFilenames, httpFilenames, args, executeIfExists, onlyFirstMatch)
 	if err != nil {
-		myKeptn.Logger.Error(fmt.Sprintf("Error: %s", err.Error()))
+		return "", keptnv2.ResultFailed, keptnv2.StatusErrored, err
+	}
+	defer os.Remove(eventJSONFileName)
+
+	var executable string
+	var argsToUse []string
+
+	// check if script ends with .py
+	if strings.HasSuffix(scriptFileName, ".py") {
+		executable = "python3"
+		argsToUse = []string{scriptFileName, eventJSONFileName}
+	} else if strings.HasSuffix(scriptFileName, ".sh") {
+		executable = "bash"
+		argsToUse = []string{scriptFileName, eventJSONFileName}
+	} else {
+		// invalid filename found
+		return "", keptnv2.ResultFailed, keptnv2.StatusErrored, fmt.Errorf("Unhandled extension for file %s", scriptFileName)
 	}
 
-	// delete the temp data file
-	os.Remove(eventJsonFileName)
+	// Lets execute it
+	output, err := executeCommand(executable, argsToUse, nil, nil)
 
-	// cleanup the scriptName - remove the GenericScriptFolderBase
-	scriptName = strings.TrimPrefix(scriptName, GenericScriptFolderBase)
+	if err != nil {
+		// return a failed result
+		return output, keptnv2.ResultFailed, keptnv2.StatusSucceeded, err
+	}
 
-	return status, scriptName, responsePayload, err
+	return output, keptnv2.ResultPass, keptnv2.StatusSucceeded, nil
 }
 
-/**
- * Analyzes the response payload and e.g: sends a keptn event, raise an error, ...
- * Here are two examples
-   #1: Just an error that will be logged as an error and in the future maybe sent to keptn as an error event
-   {
-	   "error" : "errormessage"
-   }
+func storeCloudEventInFile(incomingEvent cloudevents.Event) (string, error) {
+	// First - lets store the event as a json file on the filesystem as we are passing it to the script as an argument
 
-   #2: This will instruct Keptn to send a specific event including the necessary metadata which will be merged with other defaults, e.g: project, stage, service, incoming labels ...
-   {
-	   "type" : "sh.keptn.events.tests-finished",
-	   "data" : {
-		   "start" : "2020-11-19T16:41:00Z",
-		   "result" : "pass",
-		   "labels" : {
-			   "TestReportLink" : "https://mytestingtoolreport"
-		   }
-	   }
-   }
-*/
-func handleScriptResponsePayload(myKeptn *keptn.Keptn, keptnEvent BaseKeptnEvent, incomingEvent cloudevents.Event, responsePayload string) error {
+	eventJSONFileName := fmt.Sprintf("%s.event.json", incomingEvent.ID())
 
+	// marshal incomingEvent
+	dataAsJSON, err := json.Marshal(incomingEvent)
+
+	if err != nil {
+		log.Printf("Couldn't marshal incoming event to JSON string: %s", err.Error())
+		return "", err
+	}
+
+	file, err := os.Create(eventJSONFileName)
+
+	file.Write(dataAsJSON)
+	defer file.Close()
+
+	return eventJSONFileName, nil
+}
+
+// HandleResponsePayload trys to parse the response of a command as json and returns it
+func HandleResponsePayload(responsePayload string) (map[string]interface{}, error) {
 	// no payload or not json?
 	if responsePayload == "" || !strings.HasPrefix(responsePayload, "{") {
-		return nil
+		return nil, nil
 	}
 
+	// parse response
 	var parsedResponse map[string]interface{}
 	err := json.Unmarshal([]byte(responsePayload), &parsedResponse)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Check for error
 	if errorValue, errorOk := parsedResponse["error"]; errorOk {
-		return errors.New(errorValue.(string))
+		return nil, errors.New(errorValue.(string))
 	}
 
-	// Check for event - if one is specified we send that event to Keptn
-	if typeValue, typeOk := parsedResponse["type"]; typeOk {
-
-		// Handle labels as they are used for all events
-		var newLabels map[string]string
-		if labels, labelsOk := parsedResponse["labels"]; labelsOk {
-			newLabels = labels.(map[string]string)
-		}
-
-		if typeValue == keptn.DeploymentFinishedEventType {
-			deployFinishEventData := &keptn.DeploymentFinishedEventData{}
-			err := incomingEvent.DataAs(deployFinishEventData)
-			if err != nil {
-				return err
-			}
-
-			if testStrategy, testStrategyOk := parsedResponse["teststrategy"]; testStrategyOk {
-				deployFinishEventData.TestStrategy = testStrategy.(string)
-			}
-
-			if deploymentStrategy, deploymentStrategyOk := parsedResponse["deploymentstrategy"]; deploymentStrategyOk {
-				deployFinishEventData.DeploymentStrategy = deploymentStrategy.(string)
-			}
-
-			if deploymentURILocal, deploymentURILocalOk := parsedResponse["deploymentURILocal"]; deploymentURILocalOk {
-				deployFinishEventData.DeploymentURILocal = deploymentURILocal.(string)
-			}
-
-			if deploymentURIPublic, deploymentURIPublicOk := parsedResponse["deploymentURIPublic"]; deploymentURIPublicOk {
-				deployFinishEventData.DeploymentURIPublic = deploymentURIPublic.(string)
-			}
-
-			eventSource := "generic-executor-service"
-			if source, sourceOk := parsedResponse["source"]; sourceOk {
-				eventSource = source.(string)
-			}
-
-			for k, v := range newLabels {
-				deployFinishEventData.Labels[k] = v
-			}
-
-			myKeptn.SendDeploymentFinishedEvent(&incomingEvent,
-				deployFinishEventData.TestStrategy,
-				deployFinishEventData.DeploymentStrategy,
-				deployFinishEventData.Image,
-				deployFinishEventData.Tag,
-				deployFinishEventData.DeploymentURILocal,
-				deployFinishEventData.DeploymentURIPublic,
-				deployFinishEventData.Labels, eventSource)
-
-		} else if typeValue == keptn.TestsFinishedEventType {
-			testFinishEventData := &keptn.TestsFinishedEventData{}
-			err := incomingEvent.DataAs(testFinishEventData)
-			if err != nil {
-				return err
-			}
-
-			if testStrategy, testStrategyOk := parsedResponse["teststrategy"]; testStrategyOk {
-				testFinishEventData.TestStrategy = testStrategy.(string)
-			}
-
-			if deploymentStrategy, deploymentStrategyOk := parsedResponse["deploymentstrategy"]; deploymentStrategyOk {
-				testFinishEventData.DeploymentStrategy = deploymentStrategy.(string)
-			}
-
-			if start, startOk := parsedResponse["start"]; startOk {
-				testFinishEventData.Start = start.(string)
-			}
-
-			if result, resultOk := parsedResponse["result"]; resultOk {
-				testFinishEventData.Result = result.(string)
-			}
-
-			eventSource := "generic-executor-service"
-			if source, sourceOk := parsedResponse["source"]; sourceOk {
-				eventSource = source.(string)
-			}
-
-			// if no start time is passed we use the time from the incoming event
-			startTime, err := time.Parse("2020-11-19T16:41:00Z", testFinishEventData.Start)
-			if err != nil {
-				startTime = incomingEvent.Time()
-			}
-
-			for k, v := range newLabels {
-				testFinishEventData.Labels[k] = v
-			}
-
-			myKeptn.SendTestsFinishedEvent(&incomingEvent,
-				testFinishEventData.TestStrategy,
-				testFinishEventData.DeploymentStrategy,
-				startTime,
-				testFinishEventData.Result,
-				testFinishEventData.Labels, eventSource)
-		}
-	}
-
-	return nil
+	return parsedResponse, nil
 }
 
-/**
-* Here are all the handler functions for the individual event
-  See https://github.com/keptn/spec/blob/0.1.3/cloudevents.md for details on the payload
 
-  -> "sh.keptn.event.configuration.change"
-  -> "sh.keptn.events.deployment-finished"
-  -> "sh.keptn.events.tests-finished"
-  -> "sh.keptn.event.start-evaluation"
-  -> "sh.keptn.events.evaluation-done"
-  -> "sh.keptn.event.problem.open"
-	-> "sh.keptn.events.problem"
-	-> "sh.keptn.event.action.triggered"
-*/
+// GenericCloudEventsHandler handles all cloud-events by looking up a script-file and executing it
+func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents.Event, data interface{}) error {
+	log.Printf("Handling %s Event: %s", incomingEvent.Type(), incomingEvent.Context.GetID())
+	log.Printf("CloudEvent %T: %v", data, data)
 
-/**
- * Initalizes KeptnBaseEvent from event object and passed values
- */
-func initializeKeptnBaseEvent(incomingEvent cloudevents.Event, project, stage, service string, labels map[string]string) BaseKeptnEvent {
-	var shkeptncontext string
-	incomingEvent.Context.ExtensionAs("shkeptncontext", &shkeptncontext)
+	// check if the status type is either 'triggered', 'started', or 'finished'
+	split := strings.Split(incomingEvent.Type(), ".")
 
-	nano := incomingEvent.Time().UTC().UnixNano()
-	milli := nano / 1000000
-
-	// create a base Keptn Event
-	keptnEvent := BaseKeptnEvent{
-		event:     incomingEvent.Type(),
-		source:    incomingEvent.Source(),
-		context:   shkeptncontext,
-		time:      incomingEvent.Time().String(),
-		timeutc:   incomingEvent.Time().UTC().String(),
-		timeutcms: strconv.FormatInt(milli, 10),
+	if len(split) < 3 {
+		return fmt.Errorf("Failed to split event of type %s", incomingEvent.Type())
 	}
 
-	keptnEvent.project = project
-	keptnEvent.stage = stage
-	keptnEvent.service = service
-	keptnEvent.labels = labels
+	// split incoming event by dots and separate it into statusType, taskSequencename and stageName
+	statusType := split[len(split)-1]
+	taskSequenceName := split[len(split)-2]
+	stageName := split[len(split)-3]
 
-	return keptnEvent
-}
+	eventName := fmt.Sprintf("%s.%s", taskSequenceName, statusType)
 
-// Handles ConfigureMonitoringEventType = "sh.keptn.event.monitoring.configure"
-func HandleConfigureMonitoringEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.ConfigureMonitoringEventData) error {
-	// log.Printf("Handling Configure Monitoring Event: %s", incomingEvent.Context.GetID())
+	log.Printf("stage=%s,task=%s,status=%s", stageName, taskSequenceName, statusType)
 
-	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, "", data.Service, map[string]string{})
+	// prefix for storing filenames
+	uniquePrefix := incomingEvent.Context.GetID()
 
-	eventName := "monitoring.configure"
-	_, _, payload, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
+	// Check if a suitable script/... exists; exit if not
+	scriptFileName, err := findAndStoreScriptFile(myKeptn, eventName, uniquePrefix)
+
 	if err != nil {
+		// not found -> ignore this event
+		log.Printf("Ignoring event %s as no suitable file was found", eventName)
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
-	return err
-}
+	// Script exists -> Send task.started event
+	_, err = myKeptn.SendTaskStartedEvent(&keptnv2.EventData{
+		Message: fmt.Sprintf("Found script %s", scriptFileName),
+	}, ServiceName)
 
-//
-// Handles ConfigurationChangeEventType = "sh.keptn.event.configuration.change"
-// TODO: add in your handler code
-//
-func HandleConfigurationChangeEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.ConfigurationChangeEventData) error {
-	// log.Printf("Handling Configuration Changed Event: %s", incomingEvent.Context.GetID())
-
-	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
-
-	eventName := "configuration.change"
-	_, _, payload, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 	if err != nil {
+		log.Printf("Failed to send task.started event")
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
-	return err
-}
+	log.Printf("Executing %s", scriptFileName)
 
-//
-// Handles DeploymentFinishedEventType = "sh.keptn.events.deployment-finished"
-// TODO: add in your handler code
-//
-func HandleDeploymentFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.DeploymentFinishedEventData) error {
-	// log.Printf("Handling Deployment Finished Event: %s", incomingEvent.Context.GetID())
+	response, result, status, err := executeScriptOrHTTP(scriptFileName, incomingEvent)
 
-	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
-	keptnEvent.deployment = data.DeploymentStrategy
-	keptnEvent.testStrategy = data.TestStrategy
-	keptnEvent.deploymentURILocal = data.DeploymentURILocal
-	keptnEvent.deploymentURIPublic = data.DeploymentURIPublic
-	keptnEvent.image = data.Image
-	keptnEvent.tag = data.Tag
-
-	eventName := "deployment.finished"
-	_, _, payload, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 	if err != nil {
+		// script execution failed - send finished event
+		_, err = myKeptn.SendTaskFinishedEvent(&keptnv2.EventData{
+			Status:  status,
+			Result:  result,
+			Message: fmt.Sprintf("Failed to execute %s: %s", scriptFileName, err.Error()),
+		}, ServiceName)
+
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
-	return err
-}
+	// ToDo: Handle response
+	responseJSON, err := HandleResponsePayload(response)
 
-//
-// Handles TestsFinishedEventType = "sh.keptn.events.tests-finished"
-// TODO: add in your handler code
-//
-func HandleTestsFinishedEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.TestsFinishedEventData) error {
-	// log.Printf("Handling Tests Finished Event: %s", incomingEvent.Context.GetID())
-
-	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
-	keptnEvent.deployment = data.DeploymentStrategy
-	keptnEvent.testStrategy = data.TestStrategy
-	keptnEvent.testStart = data.Start
-	keptnEvent.testEnd = data.End
-
-	eventName := "tests.finished"
-	_, _, payload, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
 	if err != nil {
+		// failed to parse response payload
+		_, err = myKeptn.SendTaskFinishedEvent(&keptnv2.EventData{
+			Status:  keptnv2.StatusSucceeded,
+			Result:  keptnv2.ResultWarning,
+			Message: fmt.Sprintf("Failed to parse response: %s", err.Error()),
+		}, ServiceName)
+
 		return err
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
-	return err
-}
-
-//
-// Handles EvaluationDoneEventType = "sh.keptn.event.start-evaluation"
-// TODO: add in your handler code
-//
-func HandleStartEvaluationEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.StartEvaluationEventData) error {
-	// log.Printf("Handling Start Evaluation Event: %s", incomingEvent.Context.GetID())
-
-	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
-	keptnEvent.deployment = data.DeploymentStrategy
-	keptnEvent.testStrategy = data.TestStrategy
-	keptnEvent.evaluationStart = data.Start
-	keptnEvent.evaluationEnd = data.End
-
-	eventName := "start.evaluation"
-	_, _, payload, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
-	if err != nil {
-		return err
+	// finally send a task.finished event
+	responseCloudEvent := &keptnv2.EventData{
+		Status:  keptnv2.StatusSucceeded,
+		Result:  result,
+		Message: fmt.Sprintf("Script successfully executed: %s", response),
 	}
 
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
-	return err
-}
+	// ToDo: Merge responseJSON as a sub-property of the above eventdata
+	log.Printf("%v",responseJSON)
 
-//
-// Handles DeploymentFinishedEventType = "sh.keptn.events.evaluation-done"
-// TODO: add in your handler code
-//
-func HandleEvaluationDoneEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.EvaluationDoneEventData) error {
-	// log.Printf("Handling Evaluation Done Event: %s", incomingEvent.Context.GetID())
-
-	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
-	keptnEvent.deployment = data.DeploymentStrategy
-	keptnEvent.testStrategy = data.TestStrategy
-	keptnEvent.evaluationResult = data.Result
-
-	eventName := "evaluation.done"
-	_, _, payload, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
-	if err != nil {
-		return err
-	}
-
-	err = handleScriptResponsePayload(myKeptn, keptnEvent, incomingEvent, payload)
-	return err
-}
-
-//
-// Handles InternalGetSLIEventType = "sh.keptn.internal.event.get-sli"
-// TODO: add in your handler code
-//
-func HandleInternalGetSLIEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.InternalGetSLIEventData) error {
-	// log.Printf("Handling Internal Get SLI Event: %s", incomingEvent.Context.GetID())
-
-	return nil
-}
-
-//
-// Handles ProblemOpenEventType = "sh.keptn.event.problem.open"
-// Handles ProblemEventType = "sh.keptn.events.problem"
-// TODO: add in your handler code
-//
-func HandleProblemEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.ProblemEventData) error {
-	// log.Printf("Handling Problem Event: %s", incomingEvent.Context.GetID())
-
-	// Deprecated since Keptn 0.7.0 - use the HandleActionTriggeredEvent instead
-
-	return nil
-}
-
-//
-// Handles ActionTriggeredEventType = "sh.keptn.event.action.triggered"
-// TODO: add in your handler code
-//
-func HandleActionTriggeredEvent(myKeptn *keptn.Keptn, incomingEvent cloudevents.Event, data *keptn.ActionTriggeredEventData) error {
-	// log.Printf("Handling Action Triggered Event: %s", incomingEvent.Context.GetID())
-
-	keptnEvent := initializeKeptnBaseEvent(incomingEvent, data.Project, data.Stage, data.Service, data.Labels)
-	keptnEvent.action = data.Action.Action
-	keptnEvent.problemState = data.Problem.State
-	keptnEvent.problemID = data.Problem.ProblemID
-	keptnEvent.problemTitle = data.Problem.ProblemTitle
-	keptnEvent.pid = data.Problem.PID
-	keptnEvent.problemURL = data.Problem.ProblemURL
-
-	// Get remediation values from data.
-	keptnEvent.remediationValues = make(map[string]string)
-	values, ok := data.Action.Value.(map[string]interface{})
-	if ok {
-		for keyValue, valueValue := range values {
-			keptnEvent.remediationValues[keyValue] = fmt.Sprintf("%v", valueValue)
-			log.Println(keyValue + ": " + keptnEvent.remediationValues[keyValue])
-		}
-	}
-
-	eventName := "action.triggered." + data.Action.Action
-	status, scriptName, payload, err := _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, false, true)
-
-	// lets see if we have found an action - if so - lets notify keptn - then execute it - and the report when we are done
-	if status == EXECUTESTATUS_ACTIONFOUND {
-
-		// Step 1: Send an ActionStartedEvent
-		actionStartedEventData := &keptn.ActionStartedEventData{}
-		err := incomingEvent.DataAs(actionStartedEventData)
-		if err != nil {
-			log.Printf("Got Data Error: %s", err.Error())
-			return err
-		}
-
-		// making sure we pass Problem URL, Action and Executor Script as labels
-		if data.Labels == nil {
-			data.Labels = make(map[string]string)
-		}
-		data.Labels["Problem URL"] = keptnEvent.problemURL
-		if scriptName != "" {
-			data.Labels[data.Action.Action] = scriptName
-		}
-
-		err = myKeptn.SendActionStartedEvent(&incomingEvent, data.Labels, "generic-executor-service")
-		if err != nil {
-			log.Printf("Got Error From SendActionStartedEvent: %s", err.Error())
-			return err
-		}
-
-		// Step 2: Lets execute the Script
-		var actionResult keptn.ActionResult
-		status, scriptName, payload, err = _executeScriptOrHttEventHandler(myKeptn, keptnEvent, data, eventName, true, false)
-		if status == EXECUTESTATUS_SUCCESSFULL {
-			log.Printf("Successful execution of action")
-			actionResult.Result = keptn.ActionResultPass
-			actionResult.Status = keptn.ActionStatusSucceeded
-		} else {
-			log.Printf("Execution of action failed")
-			actionResult.Result = keptn.ActionResultFailed
-			actionResult.Status = keptn.ActionStatusErrored
-		}
-
-		// we allow the script to pass back the actual result, e.g: the output
-		if payload != "" {
-			actionResult.Status = keptn.ActionStatusType(payload)
-		}
-
-		// STep 3: Send an action finished
-		myKeptn.SendActionFinishedEvent(&incomingEvent, actionResult, data.Labels, "generic-executor-service")
-		if err != nil {
-			log.Printf("Got Error From SendActionFinishedEvent: %s", err.Error())
-			return err
-		}
-	}
+	_, err = myKeptn.SendTaskFinishedEvent(responseCloudEvent, ServiceName)
 
 	return err
 }
