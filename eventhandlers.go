@@ -143,7 +143,7 @@ func storeCloudEventInFile(incomingEvent cloudevents.Event) (string, error) {
 	return eventJSONFileName, nil
 }
 
-// HandleResponsePayload trys to parse the response of a command as json and returns it
+// HandleResponsePayload tries to parse the response of a command as json and returns it
 func HandleResponsePayload(responsePayload string) (map[string]interface{}, error) {
 	// no payload or not json?
 	if responsePayload == "" || !strings.HasPrefix(responsePayload, "{") {
@@ -165,7 +165,6 @@ func HandleResponsePayload(responsePayload string) (map[string]interface{}, erro
 	return parsedResponse, nil
 }
 
-
 // GenericCloudEventsHandler handles all cloud-events by looking up a script-file and executing it
 func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents.Event, data interface{}) error {
 	log.Printf("Handling %s Event: %s", incomingEvent.Type(), incomingEvent.Context.GetID())
@@ -180,12 +179,11 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 
 	// split incoming event by dots and separate it into statusType, taskSequencename and stageName
 	statusType := split[len(split)-1]
-	taskSequenceName := split[len(split)-2]
-	stageName := split[len(split)-3]
+	taskName := split[len(split)-2]
 
-	eventName := fmt.Sprintf("%s.%s", taskSequenceName, statusType)
+	eventName := fmt.Sprintf("%s.%s", taskName, statusType)
 
-	log.Printf("stage=%s,task=%s,status=%s", stageName, taskSequenceName, statusType)
+	log.Printf("task=%s,status=%s", taskName, statusType)
 
 	// prefix for storing filenames
 	uniquePrefix := incomingEvent.Context.GetID()
@@ -224,19 +222,14 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 		return err
 	}
 
-	// ToDo: Handle response
 	responseJSON, err := HandleResponsePayload(response)
 
 	if err != nil {
 		// failed to parse response payload
-		_, err = myKeptn.SendTaskFinishedEvent(&keptnv2.EventData{
-			Status:  keptnv2.StatusSucceeded,
-			Result:  keptnv2.ResultWarning,
-			Message: fmt.Sprintf("Failed to parse response: %s", err.Error()),
-		}, ServiceName)
-
-		return err
+		return handleError(myKeptn, err)
 	}
+
+	log.Printf("%v", responseJSON)
 
 	// finally send a task.finished event
 	responseCloudEvent := &keptnv2.EventData{
@@ -245,10 +238,28 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 		Message: fmt.Sprintf("Script successfully executed: %s", response),
 	}
 
-	// ToDo: Merge responseJSON as a sub-property of the above eventdata
-	log.Printf("%v",responseJSON)
+	// convert the event to a map[string]interface{} to set the result of the operation as a property of the outgoing event
+	responseEventMap := map[string]interface{}{}
+	if err := keptnv2.Decode(response, responseEventMap); err != nil {
+		return handleError(myKeptn, err)
+	}
 
+	responseEventMap[taskName] = responseJSON
+
+	if err := keptnv2.Decode(responseEventMap, responseCloudEvent); err != nil {
+		return handleError(myKeptn, err)
+	}
 	_, err = myKeptn.SendTaskFinishedEvent(responseCloudEvent, ServiceName)
+
+	return err
+}
+
+func handleError(myKeptn *keptnv2.Keptn, err error) error {
+	_, err = myKeptn.SendTaskFinishedEvent(&keptnv2.EventData{
+		Status:  keptnv2.StatusSucceeded,
+		Result:  keptnv2.ResultWarning,
+		Message: fmt.Sprintf("Failed to parse response: %s", err.Error()),
+	}, ServiceName)
 
 	return err
 }

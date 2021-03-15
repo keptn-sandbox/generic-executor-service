@@ -68,7 +68,7 @@ func processKeptnCloudEvent(ctx context.Context, event cloudevents.Event) error 
 
 /**
  * Usage: ./main
- * no args: starts listening for cloudnative events on localhost:port/path
+ * no args: starts listening for CloudEvents on localhost:port/path
  *
  * Environment Variables
  * env=runlocal   -> will fetch resources from local drive instead of configuration service
@@ -83,7 +83,7 @@ func main() {
 }
 
 /**
- * Opens up a listener on localhost:port/path and passes incoming requets to gotEvent
+ * Opens up a listener on localhost:port/path and passes incoming requests to gotEvent
  */
 func _main(args []string, env envConfig) int {
 	// configure keptn options

@@ -111,9 +111,13 @@ func getKeptnResource(myKeptn *keptnv2.Keptn, resource string, uniquePrefix stri
 func replaceKeptnPlaceholders(input string, incomingEvent cloudevents.Event) string {
 	result := input
 
-	// ToDo: This needs to be refactored to replace anything that appears in the cloudevent
-
 	// first we do the regular keptn values
+	myMap := map[string]interface{}{}
+	if err := keptnv2.Decode(incomingEvent, myMap); err != nil {
+		return input
+	}
+
+	input = replacePlaceHolderRecursively(input, "", myMap)
 
 	// now we do all environment variables
 	// TODO: This is mega dangerous, this allows leaking of any environment variable, e.g., Api Tokens of Keptn/Kubernetes
@@ -122,6 +126,25 @@ func replaceKeptnPlaceholders(input string, incomingEvent cloudevents.Event) str
 	// ToDo: This is also mega dangerous, don't do this
 
 	return result
+}
+
+func replacePlaceHolderRecursively(input, keyPath string, values map[string]interface{}) string {
+	for key, value := range values {
+		var newKeyPath string
+		if keyPath != "" {
+			newKeyPath = keyPath + "." + key
+		} else {
+			newKeyPath = key
+		}
+		newKeyPathPlaceHolder := "${" + newKeyPath + "}"
+		switch value.(type) {
+		case string:
+			input = strings.ReplaceAll(input, newKeyPathPlaceHolder, value.(string))
+		case map[string]interface{}:
+			input = replacePlaceHolderRecursively(input, newKeyPath, value.(map[string]interface{}))
+		}
+	}
+	return input
 }
 
 func _nextCleanLine(lines []string, lineIx int, trim bool) (int, string) {
