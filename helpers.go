@@ -120,7 +120,17 @@ func replaceKeptnPlaceholders(input string, incomingEvent cloudevents.Event) str
 	input = replacePlaceHolderRecursively(input, "", myMap)
 
 	// now we do all environment variables
-	// TODO: This is mega dangerous, this allows leaking of any environment variable, e.g., Api Tokens of Keptn/Kubernetes
+	// TODO: This is mega dangerous, this needs to be adapted when we have proper secret management in Keptn
+	// now we do all environment variables
+	for _, env := range os.Environ() {
+		pair := strings.SplitN(env, "=", 2)
+		key := strings.ToLower(pair[0])
+		// if the key is prefixed with 'secret_', do not handle this environment variable
+		if strings.HasPrefix(key, "secret_") {
+			continue
+		}
+		result = strings.Replace(result, "${env."+key+"}", pair[1], -1)
+	}
 
 	// TODO: iterate through k8s secrets!
 	// ToDo: This is also mega dangerous, don't do this
@@ -142,6 +152,28 @@ func replacePlaceHolderRecursively(input, keyPath string, values map[string]inte
 			input = strings.ReplaceAll(input, newKeyPathPlaceHolder, value.(string))
 		case map[string]interface{}:
 			input = replacePlaceHolderRecursively(input, newKeyPath, value.(map[string]interface{}))
+		case []interface{}:
+			input = replacePlaceHolderArrayRecursively(input, newKeyPath, value.([]interface{}))
+		}
+	}
+	return input
+}
+
+func replacePlaceHolderArrayRecursively(input, keyPath string, values []interface{}) string {
+	if keyPath == "" {
+		return input
+	}
+	for index, value := range values {
+		var newKeyPath string
+		newKeyPath = fmt.Sprintf("%s[%d]", keyPath, index)
+		newKeyPathPlaceHolder := "${" + newKeyPath + "}"
+		switch value.(type) {
+		case string:
+			input = strings.ReplaceAll(input, newKeyPathPlaceHolder, value.(string))
+		case map[string]interface{}:
+			input = replacePlaceHolderRecursively(input, newKeyPath, value.(map[string]interface{}))
+		case []interface{}:
+			input = replacePlaceHolderArrayRecursively(input, newKeyPath, value.([]interface{}))
 		}
 	}
 	return input

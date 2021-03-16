@@ -16,7 +16,7 @@ func Test_replacePlaceHolderRecursively(t *testing.T) {
 		{
 			name: "replace placeholders",
 			args: args{
-				input:   "this should contain ${data.project} and ${data.my.property}",
+				input:   "this should contain ${data.project} and ${data.my.property} and ${data.array[0]} and ${data.array[1].prop}",
 				keyPath: "",
 				values: map[string]interface{}{
 					"data": map[string]interface{}{
@@ -24,10 +24,16 @@ func Test_replacePlaceHolderRecursively(t *testing.T) {
 						"my": map[string]interface{}{
 							"property": "some-property",
 						},
+						"array": []interface{}{
+							"foo",
+							map[string]interface{}{
+								"prop": "bla",
+							},
+						},
 					},
 				},
 			},
-			want: "this should contain my-project and some-property",
+			want: "this should contain my-project and some-property and foo and bla",
 		},
 	}
 	for _, tt := range tests {
