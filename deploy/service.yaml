@@ -57,7 +57,7 @@ spec:
       serviceAccountName: generic-executor-service
       containers:
         - name: generic-executor-service
-          image: keptnsandbox/generic-executor-service:0.3
+          image: bacherfl/generic-executor-service:0.8.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
