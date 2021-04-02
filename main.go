@@ -47,7 +47,7 @@ func parseKeptnCloudEventPayload(event cloudevents.Event, data interface{}) erro
  */
 func processKeptnCloudEvent(ctx context.Context, event cloudevents.Event) error {
 	// create keptn handler
-	log.Printf("Initializing Keptn Handler")
+	log.Printf("Initializing Keptn Handler: local=%s, url=%s", keptnOptions.UseLocalFileSystem, keptnOptions.ConfigurationServiceURL)
 	myKeptn, err := keptnv2.NewKeptn(&event, keptnOptions)
 	if err != nil {
 		return errors.New("Could not create Keptn Handler: " + err.Error())
@@ -94,7 +94,7 @@ func _main(args []string, env envConfig) int {
 
 	keptnOptions.ConfigurationServiceURL = env.ConfigurationServiceUrl
 
-	log.Println("Starting keptn-service-template-go...")
+	log.Println("Starting generic-executor...")
 	log.Printf("    on Port = %d; Path=%s", env.Port, env.Path)
 
 	ctx := context.Background()

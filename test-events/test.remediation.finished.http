@@ -1,18 +1,8 @@
-##
 POST http://localhost:8080/
 Content-Type: application/cloudevents+json
 
 {
   "data": {
-    "action" : {
-      "Name" : "ActionName",
-      "Action" : "myaction",
-      "Description" : "Executes a generic action",
-      "Value" : {
-        "key1" : "value1",
-        "key2" : "value2"
-      }
-    },
     "labels": {
       "Problem URL": "https://live.dynatrace.com/#problems/problemdetails;pid=-3728904940314550461_1617358188713V2"
     },
@@ -27,8 +17,7 @@ Content-Type: application/cloudevents+json
   "source": "remediation-service",
   "specversion": "1.0",
   "time": "2021-04-02T10:10:52.511Z",
-  "type": "sh.keptn.event.action.triggered",
+  "type": "sh.keptn.event.remediation.finished",
   "shkeptncontext": "2d333732-3839-4034-b934-303331343535",
-  "triggeredid": "1a21f70d-336c-4bcd-a42a-0845239c3503"  
+  "triggeredid": "1a21f70d-336c-4bcd-a42a-0845239c3503"
 }
-###

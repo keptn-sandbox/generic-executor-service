@@ -34,6 +34,8 @@ func findAndStoreScriptFile(myKeptn *keptnv2.Keptn, filePrefix string, uniquePre
 			log.Printf("Found script %s and stored it as %s", filename, resourceFilename)
 
 			return resourceFilename, nil
+		} else {
+			log.Printf("%s not found: %s", filename, err.Error())
 		}
 	}
 
@@ -180,78 +182,98 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 	// split incoming event by dots and separate it into statusType, taskSequencename and stageName
 	statusType := split[len(split)-1]
 	taskName := split[len(split)-2]
-
-	eventName := fmt.Sprintf("%s.%s", taskName, statusType)
-
 	log.Printf("task=%s,status=%s", taskName, statusType)
+
+	// list of all filenames we want to check
+	eventNamesToExecute := []string{}
+
+	// Special Handling for action.triggered - we need to extract the action name because we will be looking for files called action.triggered.actionname.XX
+	if incomingEvent.Type() == keptnv2.GetTriggeredEventType(keptnv2.ActionTaskName) {
+		actionTriggeredEvent := &keptnv2.ActionTriggeredEventData{}
+		err := incomingEvent.DataAs(actionTriggeredEvent)
+		if err != nil {
+			return fmt.Errorf("Failed to parse action triggered event %s", incomingEvent.Type())
+		}
+
+		eventNamesToExecute = append(eventNamesToExecute, fmt.Sprintf("%s.%s.%s", taskName, statusType, actionTriggeredEvent.Action.Action))
+	}
+
+	// by default we always check for taskName.statusType, e.g: test.triggered
+	fmt.Sprintf("%s.%s", taskName, statusType)
 
 	// prefix for storing filenames
 	uniquePrefix := incomingEvent.Context.GetID()
 
-	// Check if a suitable script/... exists; exit if not
-	scriptFileName, err := findAndStoreScriptFile(myKeptn, eventName, uniquePrefix)
+	// now we iterate through all eventName we want to look for scripts for
+	for _, eventName := range eventNamesToExecute {
 
-	if err != nil {
-		// not found -> ignore this event
-		log.Printf("Ignoring event %s as no suitable file was found", eventName)
-		return err
-	}
+		// Check if a suitable script/... exists; exit if not
+		scriptFileName, err := findAndStoreScriptFile(myKeptn, eventName, uniquePrefix)
 
-	// Script exists -> Send task.started event
-	_, err = myKeptn.SendTaskStartedEvent(&keptnv2.EventData{
-		Message: fmt.Sprintf("Found script %s", scriptFileName),
-	}, ServiceName)
+		if err != nil {
+			// not found -> ignore this event
+			log.Printf("Ignoring event %s as no suitable file was found", eventName)
+			continue
+			// return err
+		}
 
-	if err != nil {
-		log.Printf("Failed to send task.started event")
-		return err
-	}
-
-	log.Printf("Executing %s", scriptFileName)
-
-	response, result, status, err := executeScriptOrHTTP(scriptFileName, incomingEvent)
-
-	if err != nil {
-		// script execution failed - send finished event
-		_, err = myKeptn.SendTaskFinishedEvent(&keptnv2.EventData{
-			Status:  status,
-			Result:  result,
-			Message: fmt.Sprintf("Failed to execute %s: %s", scriptFileName, err.Error()),
+		// Script exists -> Send task.started event
+		_, err = myKeptn.SendTaskStartedEvent(&keptnv2.EventData{
+			Message: fmt.Sprintf("Found script %s", scriptFileName),
 		}, ServiceName)
 
-		return err
-	}
+		if err != nil {
+			log.Printf("Failed to send task.started event")
+			return err
+		}
 
-	responseJSON, err := HandleResponsePayload(response)
+		log.Printf("Executing %s", scriptFileName)
 
-	if err != nil {
-		// failed to parse response payload
-		return handleError(myKeptn, err)
-	}
+		response, result, status, err := executeScriptOrHTTP(scriptFileName, incomingEvent)
 
-	log.Printf("%v", responseJSON)
+		if err != nil {
+			// script execution failed - send finished event
+			_, err = myKeptn.SendTaskFinishedEvent(&keptnv2.EventData{
+				Status:  status,
+				Result:  result,
+				Message: fmt.Sprintf("Failed to execute %s: %s", scriptFileName, err.Error()),
+			}, ServiceName)
 
-	// finally send a task.finished event
-	responseCloudEvent := &keptnv2.EventData{
-		Status:  keptnv2.StatusSucceeded,
-		Result:  result,
-		Message: fmt.Sprintf("Script successfully executed: %s", response),
-	}
+			return err
+		}
 
-	// convert the event to a map[string]interface{} to set the result of the operation as a property of the outgoing event
-	responseEventMap := map[string]interface{}{}
-	if err := keptnv2.Decode(response, responseEventMap); err != nil {
-		return handleError(myKeptn, err)
-	}
+		responseJSON, err := HandleResponsePayload(response)
 
-	responseEventMap[taskName] = responseJSON
+		if err != nil {
+			// failed to parse response payload
+			return handleError(myKeptn, err)
+		}
 
-	if err := keptnv2.Decode(responseEventMap, responseCloudEvent); err != nil {
-		return handleError(myKeptn, err)
-	}
-	_, err = myKeptn.SendTaskFinishedEvent(responseCloudEvent, ServiceName)
+		log.Printf("%v", responseJSON)
 
-	return err
+		// finally send a task.finished event
+		responseCloudEvent := &keptnv2.EventData{
+			Status:  keptnv2.StatusSucceeded,
+			Result:  result,
+			Message: fmt.Sprintf("Script successfully executed: %s", response),
+		}
+
+		// convert the event to a map[string]interface{} to set the result of the operation as a property of the outgoing event
+		responseEventMap := map[string]interface{}{}
+		if err := keptnv2.Decode(response, responseEventMap); err != nil {
+			return handleError(myKeptn, err)
+		}
+
+		responseEventMap[taskName] = responseJSON
+
+		if err := keptnv2.Decode(responseEventMap, responseCloudEvent); err != nil {
+			return handleError(myKeptn, err)
+		}
+		_, err = myKeptn.SendTaskFinishedEvent(responseCloudEvent, ServiceName)
+
+	} // eventNamesToExecute
+
+	return nil
 }
 
 func handleError(myKeptn *keptnv2.Keptn, err error) error {

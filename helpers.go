@@ -42,6 +42,15 @@ func removeFiles(filesToRemove []string) {
 func getKeptnResource(myKeptn *keptnv2.Keptn, resource string, uniquePrefix string) (string, error) {
 	resourceHandler := myKeptn.ResourceHandler
 
+	// local filesystem?
+	if myKeptn.UseLocalFileSystem {
+		if _, err := os.Stat(resource); err == nil {
+			return resource, nil
+		} else {
+			return "", err
+		}
+	}
+
 	// SERVICE-LEVEL: lets try to find it on service level
 	requestedResource, err := resourceHandler.GetServiceResource(myKeptn.Event.GetProject(), myKeptn.Event.GetStage(), myKeptn.Event.GetService(), resource)
 
