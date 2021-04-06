@@ -4,6 +4,6 @@
 # It will be called with a couple of enviornment variables that are filled with Keptn Event Details, Env-Variables from the Service container as well as labels
 
 echo "This is my all.events.sh script"
-echo "Context = $CONTEXT"
+echo "Context = ${SHKEPTNCONTEXT}"
 
 # Here i could do whatever I want

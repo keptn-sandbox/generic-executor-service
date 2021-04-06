@@ -31,7 +31,7 @@ Content-Type: application/cloudevents+json
   },
   "id": "67d30f16-c8c8-4f5a-bc65-9f3b2508ea5d",
   "source": "dynatrace",
-  "specversion": "0.2",
+  "specversion": "1.0",
   "time": "2020-03-19T17:57:07.557Z",
   "type": "sh.keptn.event.problem.open",
   "shkeptncontext": "2d373436-3335-4932-b139-373734313435",

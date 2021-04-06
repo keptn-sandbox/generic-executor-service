@@ -96,7 +96,7 @@ Please have a look at the sample .http, .py and .sh files to see how the *generi
 
 ### Sample HTTP Webhook
 Here a sample http script that shows you how to call an external webhook with this capability.
-The *generic-executor-service* will replace the core Keptn Event values as well as provides each label via $LABEL_LABELNAME and each Environment Variable via $ENV_ENVNAME
+The *generic-executor-service* will replace the every field in the incoming Keptn Event with its full data path, e.g: ${proejct}, ${data.project} or ${data.label.label1}. Environment Variables that are available on the generic-executor-service itself can be accessed like ${env.env-variable}
 ```http
 configuration.change.http:
 POST https://webhook.site/YOURHOOKID
@@ -107,19 +107,19 @@ Content-Type: application/cloudevents+json
 {
   "contenttype": "application/json",
   "deploymentstrategy": "blue_green_service",
-  "project": "$PROJECT",
-  "service": "$SERVICE",
-  "stage": "$STAGE",
-  "mylabel" : "$LABEL_gitcommit",
-  "mytoken" : "$ENV_TESTTOKEN",
-  "shkeptncontext": "$CONTEXT",
-  "event": "$EVENT",
-  "source": "$SOURCE"
+  "project": "${data.projecdt}",
+  "service": "${data.service}",
+  "stage": "${data.stage}",
+  "mylabel" : "${data.label.gitcommit}",
+  "mytoken" : "${env.testtoken}",
+  "shkeptncontext": "${shkeptncontext}",
+  "type": "${type}",
+  "source": "${source}"
 }
 ```
 
 ### Sample Bash Script
-And here a sample bash script that the *generic-executor-service* is calling by setting all the Keptn context, labels and container environment variables as environment variables for this script:
+And here a sample bash script that the *generic-executor-service* is calling by setting all the Keptn incoming event fields as well as the generic-executor-service environment variables as environment variables for this script:
 ```bash
 all.event.sh:
 #!/bin/bash
@@ -128,12 +128,11 @@ all.event.sh:
 # It will be called with a couple of enviornment variables that are filled with Keptn Event Details, Env-Variables from the Service container as well as labels
 
 echo "This is my all.events.sh script"
-echo "Context = $CONTEXT"
-echo "Project = $PROJECT"
-echo "Project = $PROJECT"
-echo "Service = $SERVICE"
-echo "Stage = $STAGE"
-echo "GitCommit = $LABEL_gitcommit"
+echo "Project = $DATA_PROJECT"
+echo "Service = $DATA_SERVICE"
+echo "Stage = $DATA_STAGE"
+echo "Image = $DATA_CONFIGURATIONCHANGE_VALUES_IMAGE"
+echo "DeploymentStrategy = $DATA_DEPLOYMENT_DEPLOYMENTSTRATEGY"
 echo "TestToken = $ENV_TESTTOKEN"
 
 # Here i could do whatever I want with these values, e.g: call an external tool :-)
@@ -156,31 +155,12 @@ if len(sys.argv) > 1:
     methodArg = sys.argv[1]
 
 print("This is my genericactionname handler script and I got passed " + methodArg + " as parameter")
-print("I also have some env variables, e.g: PID=" + os.getenv('PID', "") + ", CONTEXT=" + os.getenv('CONTEXT', ""))
+print("I also have some env variables, e.g: PID=" + os.getenv('DATA_PROBLEM_PID', "") + ", SHKEPTNCONTEXT=" + os.getenv('SHKEPTNCONTEXT', ""))
 print("SOURCE=" + os.getenv('SOURCE',""))
-print("PROJECT=" + os.getenv('PROJECT',""))
-print("PROBLEMTITLE=" + os.getenv('PROBLEMTITLE',""))
+print("PROJECT=" + os.getenv('DATA_PROJECT',""))
+print("PROBLEMTITLE=" + os.getenv('DATA_PROBLEM_PROBLEMTITLE',""))
+print("And here is the message that was passed as part of the remediation action definition :" + os.getenv("DATA_ACTION_VALUE_MESSAGE", "NO MESSAGE"))
 
-```
-
-### Environment Variables ...
-
-Last but not least - here are all the available placeholders for .http files and env-variables that are passed to your .sh and .py files:
-```
-// Event Context
-$CONTEXT,$EVENT,$SOURCE,$TIMESTRING,$TIMEUTCSTRING,$TIMEUTCMS
-
-// Project Context
-$PROJECT,$STAGE,$SERVICE,$DEPLOYMENT,$TESTSTRATEGY
-    
-// Deployment Finished specific
-$DEPLOYMENTURILOCAL,$DEPLOYMENTURIPUBLIC
-
-// Labels will be made available with a $LABEL_ prefix, e.g.:
-$LABEL_gitcommit,$LABEL_anotherlabel,$LABEL_xxxx
-
-// Environment variables you pass to the generic-executor-service container in the service.yaml will be available with $ENV_ prefix
-$ENV_YOURCUSTOMENV,$ENV_KEPTN_API_TOKEN,$ENV_KEPTN_ENDPOINT,...
 ```
 
 ### Event file passed as parameter
@@ -203,22 +183,17 @@ The following is an output example that indicates that the script ran into an er
 
 **2: Return Keptn Event**
 
-Your scripts can also return a Keptn Cloud Event as JSON which will then be used by the *generic-executor-service* and sent as a Keptn Event back to Keptn. This allows you to e.g: write a script that handles a configuration-change event and then sends the *deployment-finished* event. Or you could write your own script that handles a *deployment-finished* event by then executing some tests. Once the tests are done your script can send a *test-finished* event
+Your scripts can also return a JSON object that will be used for the finished event in case your script handles a triggered event.
+In that case - simply output the fields that will go into the task names list of properties.
+
+To give you an example - if you handle the test.triggered event you can output the following to the console:
 
 ```json
 {
-  "type" : "sh.keptn.events.tests-finished",
-  "data" : {
-    "start" : "2020-11-19T16:41:00Z",
-    "result" : "pass",
-    "labels" : {
-      "TestReportLink" : "https://mytestingtoolreport"
-    }
-  }
+  "start" : "2020-11-19T16:41:00Z",
+  "end" : "2020-11-19T17:41:00Z"
 }
 ```
-
-Currently the *generic-executor-service* supports the events `sh.keptn.events.tests-finished` and `sh.keptn.events.deployment-finished`. More will follow
 
 Enjoy the fun!
 

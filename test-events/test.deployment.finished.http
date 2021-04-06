@@ -3,25 +3,33 @@ POST http://localhost:8080/
 Content-Type: application/cloudevents+json
 
 {
-  "contenttype": "application/json",
   "data": {
-    "deploymentURILocal": "http://simplenode.simpleproject-staging",
-    "deploymentURIPublic": "http://simplenode.simpleproject-staging.keptn06-agrabner.demo.keptn.sh",
-    "project": "simpleproject",
+    "deployment": {
+      "deploymentNames": [
+        "user_managed"
+      ],
+      "deploymentURIsLocal": [
+        ""
+      ],
+      "deploymentURIsPublic": [
+        "http://simplenode.demo-rollout-staging.keptn08-agrabner.demo.keptn.sh/"
+      ],
+      "deploymentstrategy": "user_managed",
+      "gitCommit": "2aed3f456ef19c901478e5e2f3ce1a489c524a37"
+    },
+    "message": "Successfully deployed",
+    "project": "demo-rollout",
+    "result": "pass",
     "service": "simplenode",
     "stage": "staging",
-    "result": "pass",
-    "labels": {
-        "gitcommit" : "commit-ABCDEF123123",
-        "jenkinsjob" : "job1234",
-        "user" : "andi"
-    }
+    "status": "succeeded"
   },
-  "id": "52fc82f5-892b-4888-a660-497c9262bb4a",
-  "source": "jenkins-service",
-  "specversion": "0.2",
-  "time": "2020-03-24T08:42:09.633Z",
-  "type": "sh.keptn.events.deployment-finished",
-  "shkeptncontext": "664d2ad3-e925-4049-a7ff-39b8e584e5b5"
+  "id": "74720cec-9366-4537-a258-be2529812c58",
+  "source": "helm-service",
+  "specversion": "1.0",
+  "time": "2021-04-06T10:32:00.067Z",
+  "type": "sh.keptn.event.deployment.finished",
+  "shkeptncontext": "e4158c2f-c0c3-41cf-b641-1c01b4cbbe9f",
+  "triggeredid": "ebc52b76-40c0-4ec2-b03c-36e90ea66a0b"
 }
 ###

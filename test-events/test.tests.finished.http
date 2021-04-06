@@ -8,18 +8,25 @@ Content-Type: application/cloudevents+json
     "project": "simpleproject",
     "service": "simplenode",
     "stage": "staging",
-    "result": "pass",
     "labels": {
         "gitcommit" : "commit-ABCDEF123123",
         "jenkinsjob" : "job1234",
         "user" : "andi"
-    }
+    },
+    "result": "pass",
+    "status": "succeeded",
+    "test": {
+      "end": "2021-04-06T10:36:14Z",
+      "gitCommit": "",
+      "start": "2021-04-06T10:35:19Z"
+    }    
   },
-  "id": "52fc82f5-892b-4888-a660-497c9262bb4a",
-  "source": "jmeter-service",
-  "specversion": "0.2",
-  "time": "2020-03-26T20:16:09.633Z",
-  "type": "sh.keptn.events.tests-finished",
-  "shkeptncontext": "664d2ad3-e925-4049-a7ff-39b8e584e5b5"
+  "id": "3a455fb7-7e48-4be0-9e20-468a007ec1b4",
+  "source": "shipyard-controller",
+  "specversion": "1.0",
+  "time": "2021-04-06T10:35:19.830Z",
+  "type": "sh.keptn.event.test.finished",
+  "shkeptncontext": "e4158c2f-c0c3-41cf-b641-1c01b4cbbe9f",
+  "shkeptnspecversion": "0.2.1"  
 }
 ###

@@ -22,11 +22,15 @@ type envConfig struct {
 	// Whether we are running locally (e.g., for testing) or on production
 	Env string `envconfig:"ENV" default:"local"`
 	// URL of the Keptn configuration service (this is where we can fetch files from the config repo)
+	VerboseLogging bool `envconfig:"VERBOSE_LOGGING" default:"false"`
+	// URL of the Keptn configuration service (this is where we can fetch files from the config repo)
 	ConfigurationServiceUrl string `envconfig:"CONFIGURATION_SERVICE" default:""`
 }
 
 // ServiceName specifies the current services name (e.g., used as source when sending CloudEvents)
 const ServiceName = "generic-executor-service"
+
+var VerboseLogging = false
 
 /**
  * Parses a Keptn Cloud Event payload (data attribute)
@@ -90,6 +94,11 @@ func _main(args []string, env envConfig) int {
 	if env.Env == "local" {
 		log.Println("env=local: Running with local filesystem to fetch resources")
 		keptnOptions.UseLocalFileSystem = true
+	}
+
+	if env.VerboseLogging {
+		log.Println("verbose_logging=true")
+		VerboseLogging = true
 	}
 
 	keptnOptions.ConfigurationServiceURL = env.ConfigurationServiceUrl

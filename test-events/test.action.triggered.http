@@ -9,8 +9,8 @@ Content-Type: application/cloudevents+json
       "Action" : "myaction",
       "Description" : "Executes a generic action",
       "Value" : {
-        "key1" : "value1",
-        "key2" : "value2"
+        "message" : "some message",
+        "somethingelse" : "value2"
       }
     },
     "labels": {
