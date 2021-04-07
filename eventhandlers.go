@@ -237,6 +237,7 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 			}
 		}
 
+		// Finally Executing the Script
 		log.Printf("Executing %s", scriptFileName)
 		response, result, status, err := executeScriptOrHTTP(scriptFileName, incomingEvent)
 
@@ -282,10 +283,11 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 
 				// convert the event to a map[string]interface{} to set the result of the operation as a property of the outgoing event
 				responseEventMap := map[string]interface{}{}
-				if err := keptnv2.Decode(data, responseEventMap); err != nil {
+				if err := keptnv2.Decode(responseCloudEvent, responseEventMap); err != nil {
 					return handleError(myKeptn, err)
 				}
 
+				// set the responseJSON to e.g: "test" when handling the test task
 				responseEventMap[taskName] = responseJSON
 
 				if err := keptnv2.Decode(responseEventMap, responseCloudEvent); err != nil {
