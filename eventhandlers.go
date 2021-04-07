@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -32,6 +33,9 @@ func (f *FinishedEventPayload) GetService() string {
 }
 
 func (f *FinishedEventPayload) GetLabels() map[string]string {
+	if f.eventData["labels"] == nil {
+		f.SetLabels(map[string]string{})
+	}
 	return f.eventData["labels"].(map[string]string)
 }
 
@@ -91,38 +95,37 @@ func findAndStoreScriptFile(myKeptn *keptnv2.Keptn, filePrefix string, uniquePre
  * @onlyFirstMatch: if true will only execute the first matching script - otherwise it will keep looking for more matches
  *
  * Return:
- * int: status, e.g: EXECUTESTATUS_XXX
- * string: name of the first matched script
  * string: return payload
+ * string: content of ID.finished.event.json if it was written
  * error: any error that may have occured
  */
 // if any of the passed files exist either executes the bash or the http request
 // The return status depends on the success of the executed script or HTTP Request. If the script fails or if the HTTP call returns a status code >= 300 the call is considered failed
 //
-func executeScriptOrHTTP(scriptFileName string, incomingEvent cloudevents.Event) (string, keptnv2.ResultType, keptnv2.StatusType, error) {
+func executeScriptOrHTTP(scriptFileName string, incomingEvent cloudevents.Event) (string, string, keptnv2.ResultType, keptnv2.StatusType, error) {
 
 	if strings.HasSuffix(scriptFileName, ".http") {
 		// Execute HTTP Test
 		parsedRequest, err := parseHttpRequestFromHttpTextFile(scriptFileName, incomingEvent)
 
 		if err != nil {
-			return "", keptnv2.ResultFailed, keptnv2.StatusErrored, fmt.Errorf("Failed to parse %s: %s", scriptFileName, err.Error())
+			return "", "", keptnv2.ResultFailed, keptnv2.StatusErrored, fmt.Errorf("Failed to parse %s: %s", scriptFileName, err.Error())
 		}
 
 		statusCode, body, requestError := executeGenericHttpRequest(parsedRequest)
 
 		if requestError != nil {
 			// request errored
-			return "", keptnv2.ResultFailed, keptnv2.StatusErrored, requestError
+			return "", "", keptnv2.ResultFailed, keptnv2.StatusErrored, requestError
 		}
 		if statusCode >= 200 && statusCode <= 299 {
 			// http status 2xx is suggesting that everything is fine
-			return body, keptnv2.ResultPass, keptnv2.StatusSucceeded, nil
+			return body, "", keptnv2.ResultPass, keptnv2.StatusSucceeded, nil
 		}
 
 		// last but not least: status code != 2xx suggests that something went wrong on the other side
 		log.Printf("HTTP Call returned status code %d", statusCode)
-		return body, keptnv2.ResultFailed, keptnv2.StatusSucceeded, nil
+		return body, "", keptnv2.ResultFailed, keptnv2.StatusSucceeded, nil
 	}
 	// else: execute the script using bash or python
 
@@ -130,7 +133,7 @@ func executeScriptOrHTTP(scriptFileName string, incomingEvent cloudevents.Event)
 	eventJSONFileName, err := storeCloudEventInFile(incomingEvent)
 
 	if err != nil {
-		return "", keptnv2.ResultFailed, keptnv2.StatusErrored, err
+		return "", "", keptnv2.ResultFailed, keptnv2.StatusErrored, err
 	}
 	defer os.Remove(eventJSONFileName)
 
@@ -146,7 +149,7 @@ func executeScriptOrHTTP(scriptFileName string, incomingEvent cloudevents.Event)
 		argsToUse = []string{scriptFileName, eventJSONFileName}
 	} else {
 		// invalid filename found
-		return "", keptnv2.ResultFailed, keptnv2.StatusErrored, fmt.Errorf("Unhandled extension for file %s", scriptFileName)
+		return "", "", keptnv2.ResultFailed, keptnv2.StatusErrored, fmt.Errorf("Unhandled extension for file %s", scriptFileName)
 	}
 
 	// Lets execute it
@@ -154,12 +157,32 @@ func executeScriptOrHTTP(scriptFileName string, incomingEvent cloudevents.Event)
 
 	if err != nil {
 		// return a failed result
-		return output, keptnv2.ResultFailed, keptnv2.StatusSucceeded, err
+		return output, "", keptnv2.ResultFailed, keptnv2.StatusSucceeded, err
 	}
 
-	return output, keptnv2.ResultPass, keptnv2.StatusSucceeded, nil
+	// lets see if the script wrote a file called
+	finishedEvent, _ := loadCloudEventFinishedFromFile(incomingEvent)
+
+	return output, finishedEvent, keptnv2.ResultPass, keptnv2.StatusSucceeded, nil
 }
 
+/**
+ * Validates whether a file with the format ID.finished.event.json exists - if so - loads it
+ */
+func loadCloudEventFinishedFromFile(incomingEvent cloudevents.Event) (string, error) {
+	eventJSONFileName := fmt.Sprintf("%s.finished.event.json", incomingEvent.ID())
+
+	content, err := ioutil.ReadFile(eventJSONFileName)
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
+}
+
+/**
+ * stores the cloud event to a local file with ID.event.json
+ */
 func storeCloudEventInFile(incomingEvent cloudevents.Event) (string, error) {
 	// First - lets store the event as a json file on the filesystem as we are passing it to the script as an argument
 
@@ -275,7 +298,7 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 
 		// Finally Executing the Script
 		log.Printf("Executing %s", scriptFileName)
-		response, result, status, err := executeScriptOrHTTP(scriptFileName, incomingEvent)
+		response, responseJSONAsString, result, status, err := executeScriptOrHTTP(scriptFileName, incomingEvent)
 
 		if err != nil {
 
@@ -298,14 +321,6 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 			}
 		}
 
-		// parse the response
-		responseJSON, err := HandleResponsePayload(response)
-
-		if err != nil {
-			// failed to parse response payload
-			return handleError(myKeptn, err)
-		}
-
 		if sendStartFinishedEvents {
 			// finally send a task.finished event
 			responseCloudEvent := &keptnv2.EventData{
@@ -314,20 +329,40 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 				Message: response,
 			}
 
-			// convert the event to a map[string]interface{} to set the result of the operation as a property of the outgoing event
-			responseEventMap := map[string]interface{}{}
-			if err := keptnv2.Decode(responseCloudEvent, responseEventMap); err != nil {
-				return handleError(myKeptn, err)
+			// parse the response - first check if there was a written file with a JSON response
+			var responseJSON map[string]interface{}
+			if responseJSONAsString != "" {
+				responseJSON, _ = HandleResponsePayload(responseJSONAsString)
+			} else {
+				// if not see if the console output is a valid JSON
+				responseJSON, _ = HandleResponsePayload(response)
 			}
 
-			payload := &FinishedEventPayload{eventData: responseEventMap}
-			if responseJSON != nil {
-				log.Printf("Script returned JSON properties for finished event: %v", responseJSON)
-				// set the responseJSON to e.g: "test" when handling the test task
-				responseEventMap[taskName] = responseJSON
-			}
+			if responseJSON == nil || err != nil {
+				// failed to parse response payload so we assume this is just regular response
+				if err != nil {
+					log.Printf("Couldn't parse the response as JSON Payload. Considering it normal response: %s", err.Error())
+				} else {
+					log.Printf("Response was not JSON - so - we consider it a normal response!")
+				}
+				_, err = myKeptn.SendTaskFinishedEvent(responseCloudEvent, ServiceName)
+			} else {
+				// TODO - need @florianbacher to look at this code
+				// convert the event to a map[string]interface{} to set the result of the operation as a property of the outgoing event
+				responseEventMap := map[string]interface{}{}
+				if err := keptnv2.Decode(responseCloudEvent, &responseEventMap); err != nil {
+					return handleError(myKeptn, err)
+				}
 
-			_, err = myKeptn.SendTaskFinishedEvent(payload, ServiceName)
+				payload := &FinishedEventPayload{eventData: responseEventMap}
+				if responseJSON != nil {
+					log.Printf("Script returned JSON properties for finished event: %v", responseJSON)
+					// set the responseJSON to e.g: "test" when handling the test task
+					responseEventMap[taskName] = responseJSON
+				}
+
+				_, err = myKeptn.SendTaskFinishedEvent(payload, ServiceName)
+			}
 		}
 
 	} // eventNamesToExecute
