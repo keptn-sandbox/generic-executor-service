@@ -269,9 +269,6 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 			return handleError(myKeptn, err)
 		}
 
-		if responseJSON != nil {
-		}
-
 		if sendStartFinishedEvents {
 			// finally send a task.finished event
 			responseCloudEvent := &keptnv2.EventData{

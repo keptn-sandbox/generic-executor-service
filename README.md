@@ -254,7 +254,7 @@ Here is a sample action.finished event sent to Keptn:
   },
   "id": "6187a43a-7112-4cd8-a4d1-1dcc3b5d11c1",
   "source": "generic-executor-service",
-  "specversion": "0.2",
+  "specversion": "1.0",
   "time": "2020-11-25T21:04:01.832Z",
   "type": "sh.keptn.event.action.finished",
   "shkeptncontext": "2d363636-3537-4030-b031-343135323139"
