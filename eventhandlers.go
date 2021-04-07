@@ -15,6 +15,42 @@ import (
 // GenericScriptFolderBase Folder in the Keptn GitHub Repo where we expect scripts and http files
 const GenericScriptFolderBase = "generic-executor/"
 
+type FinishedEventPayload struct {
+	eventData map[string]interface{}
+}
+
+func (f *FinishedEventPayload) GetProject() string {
+	return f.eventData["project"].(string)
+}
+
+func (f *FinishedEventPayload) GetStage() string {
+	return f.eventData["stage"].(string)
+}
+
+func (f *FinishedEventPayload) GetService() string {
+	return f.eventData["service"].(string)
+}
+
+func (f *FinishedEventPayload) GetLabels() map[string]string {
+	return f.eventData["labels"].(map[string]string)
+}
+
+func (f *FinishedEventPayload) SetProject(p string) {
+	f.eventData["project"] = p
+}
+
+func (f *FinishedEventPayload) SetStage(s string) {
+	f.eventData["stage"] = s
+}
+
+func (f *FinishedEventPayload) SetService(s string) {
+	f.eventData["service"] = s
+}
+
+func (f *FinishedEventPayload) SetLabels(l map[string]string) {
+	f.eventData["labels"] = l
+}
+
 func findAndStoreScriptFile(myKeptn *keptnv2.Keptn, filePrefix string, uniquePrefix string) (string, error) {
 	// we allow different files to be specified by the end user - we first look for the more specific ones that include the file name
 	allowedFilenames := []string{
@@ -278,24 +314,20 @@ func GenericCloudEventsHandler(myKeptn *keptnv2.Keptn, incomingEvent cloudevents
 				Message: response,
 			}
 
-			if responseJSON != nil {
-				log.Printf("Script returned JSON properties for finished event: %v", responseJSON)
-
-				// convert the event to a map[string]interface{} to set the result of the operation as a property of the outgoing event
-				responseEventMap := map[string]interface{}{}
-				if err := keptnv2.Decode(responseCloudEvent, responseEventMap); err != nil {
-					return handleError(myKeptn, err)
-				}
-
-				// set the responseJSON to e.g: "test" when handling the test task
-				responseEventMap[taskName] = responseJSON
-
-				if err := keptnv2.Decode(responseEventMap, responseCloudEvent); err != nil {
-					return handleError(myKeptn, err)
-				}
+			// convert the event to a map[string]interface{} to set the result of the operation as a property of the outgoing event
+			responseEventMap := map[string]interface{}{}
+			if err := keptnv2.Decode(responseCloudEvent, responseEventMap); err != nil {
+				return handleError(myKeptn, err)
 			}
 
-			_, err = myKeptn.SendTaskFinishedEvent(responseCloudEvent, ServiceName)
+			payload := &FinishedEventPayload{eventData: responseEventMap}
+			if responseJSON != nil {
+				log.Printf("Script returned JSON properties for finished event: %v", responseJSON)
+				// set the responseJSON to e.g: "test" when handling the test task
+				responseEventMap[taskName] = responseJSON
+			}
+
+			_, err = myKeptn.SendTaskFinishedEvent(payload, ServiceName)
 		}
 
 	} // eventNamesToExecute
