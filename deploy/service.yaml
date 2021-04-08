@@ -57,7 +57,7 @@ spec:
       serviceAccountName: generic-executor-service
       containers:
         - name: generic-executor-service
-          image: grabnerandi/generic-executor-service:0.8.0
+          image: keptnsandbox/generic-executor-service:0.8.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -69,7 +69,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace                
             - name: VERBOSE_LOGGING
-              value: true
+              value: "false"
             - name: YOURCUSTOMENV
               value: YOURCUSTOMVALUE
             - name: DT_API_TOKEN
