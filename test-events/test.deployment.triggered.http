@@ -1,0 +1,31 @@
+##
+POST http://localhost:8080/
+Content-Type: application/cloudevents+json
+
+{
+  "data": {
+    "configurationChange": {
+      "values": {
+        "image": "docker.io/grabnerandi/simplenodeservice:1.0.0"
+      }
+    },
+    "deployment": {
+      "deploymentURIsLocal": null,
+      "deploymentstrategy": "user_managed"
+    },
+    "message": "",
+    "project": "demo-rollout",
+    "result": "pass",
+    "service": "simplenode",
+    "stage": "staging",
+    "status": "succeeded"
+  },
+  "id": "ebc52b76-40c0-4ec2-b03c-36e90ea66a0b",
+  "source": "shipyard-controller",
+  "specversion": "1.0",
+  "time": "2021-04-06T10:31:31.849Z",
+  "type": "sh.keptn.event.deployment.triggered",
+  "shkeptncontext": "e4158c2f-c0c3-41cf-b641-1c01b4cbbe9f",
+  "shkeptnspecversion": "0.2.1"
+}
+###

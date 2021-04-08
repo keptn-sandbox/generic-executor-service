@@ -1,0 +1,19 @@
+##
+POST https://webhook.site/298d12c4-f283-4453-9dcb-8125a3172bdc
+Accept: application/json
+Cache-Control: no-cache
+Content-Type: application/cloudevents+json
+
+{
+  "contenttype": "application/json",
+  "deploymentstrategy": "${data.deployment.deploymentstrategy}",
+  "project": "${data.project}",
+  "service": "${data.service}",
+  "stage": "${data.stage}",
+  "mylabel" : "${data.deployment.gitcommit}",
+  "mytoken" : "${env.testtoken}",
+  "shkeptncontext": "${shkeptncontext}",
+  "event": "${type}",
+  "source": "${source}"
+}
+###

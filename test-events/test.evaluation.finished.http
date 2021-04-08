@@ -1,0 +1,135 @@
+##
+POST http://localhost:8080/
+Content-Type: application/cloudevents+json
+
+{
+  "data": {
+    "evaluation": {
+      "gitCommit": "",
+      "indicatorResults": [
+        {
+          "displayName": "",
+          "keySli": false,
+          "passTargets": [
+            {
+              "criteria": "<600",
+              "targetValue": 600,
+              "violated": false
+            }
+          ],
+          "score": 1,
+          "status": "pass",
+          "value": {
+            "metric": "response_time_p95",
+            "success": true,
+            "value": 470.1504558955024
+          },
+          "warningTargets": [
+            {
+              "criteria": "<=800",
+              "targetValue": 800,
+              "violated": false
+            }
+          ]
+        },
+        {
+          "displayName": "",
+          "keySli": false,
+          "passTargets": null,
+          "score": 0,
+          "status": "info",
+          "value": {
+            "metric": "throughput",
+            "success": true,
+            "value": 3685
+          },
+          "warningTargets": null
+        },
+        {
+          "displayName": "",
+          "keySli": false,
+          "passTargets": [
+            {
+              "criteria": "<=1%",
+              "targetValue": 0,
+              "violated": false
+            }
+          ],
+          "score": 2,
+          "status": "pass",
+          "value": {
+            "metric": "error_rate",
+            "success": true,
+            "value": 0
+          },
+          "warningTargets": [
+            {
+              "criteria": "<=2%",
+              "targetValue": 0,
+              "violated": false
+            }
+          ]
+        },
+        {
+          "displayName": "",
+          "keySli": false,
+          "passTargets": null,
+          "score": 0,
+          "status": "info",
+          "value": {
+            "metric": "response_time_p50",
+            "success": true,
+            "value": 0.19698531367664313
+          },
+          "warningTargets": null
+        },
+        {
+          "displayName": "",
+          "keySli": false,
+          "passTargets": [
+            {
+              "criteria": "<=500",
+              "targetValue": 500,
+              "violated": false
+            }
+          ],
+          "score": 1,
+          "status": "pass",
+          "value": {
+            "metric": "response_time_p90",
+            "success": true,
+            "value": 440.7507529272193
+          },
+          "warningTargets": [
+            {
+              "criteria": "<=600",
+              "targetValue": 600,
+              "violated": false
+            }
+          ]
+        }
+      ],
+      "result": "pass",
+      "score": 100,
+      "sloFileContent": "LS0tCnNwZWNfdmVyc2lvbjogJzAuMS4wJwpjb21wYXJpc29uOgogIGNvbXBhcmVfd2l0aDogInNpbmdsZV9yZXN1bHQiCiAgaW5jbHVkZV9yZXN1bHRfd2l0aF9zY29yZTogInBhc3MiCiAgYWdncmVnYXRlX2Z1bmN0aW9uOiBhdmcKb2JqZWN0aXZlczoKICAtIHNsaTogcmVzcG9uc2VfdGltZV9wOTUKICAgIHBhc3M6CiAgICAgIC0gY3JpdGVyaWE6CiAgICAgICAgICAtICI8NjAwIgogICAgd2FybmluZzoKICAgICAgLSBjcml0ZXJpYToKICAgICAgICAgIC0gIjw9ODAwIgogIC0gc2xpOiB0aHJvdWdocHV0CiAgLSBzbGk6IGVycm9yX3JhdGUKICAgIHdlaWdodDogMgogICAgcGFzczoKICAgICAgLSBjcml0ZXJpYToKICAgICAgICAgIC0gIjw9MSUiCiAgICB3YXJuaW5nOgogICAgICAtIGNyaXRlcmlhOgogICAgICAgICAgLSAiPD0yJSIKICAtIHNsaTogcmVzcG9uc2VfdGltZV9wNTAKICAtIHNsaTogcmVzcG9uc2VfdGltZV9wOTAKICAgIHBhc3M6CiAgICAgIC0gY3JpdGVyaWE6CiAgICAgICAgICAtICI8PTUwMCIKICAgIHdhcm5pbmc6CiAgICAgIC0gY3JpdGVyaWE6CiAgICAgICAgICAtICI8PTYwMCIKdG90YWxfc2NvcmU6CiAgcGFzczogIjkwJSIKICB3YXJuaW5nOiAiNzUlIg==",
+      "timeEnd": "2021-04-06T10:32:55Z",
+      "timeStart": "2021-04-06T10:32:00Z"
+    },
+    "labels": {
+      "DtCreds": "dynatrace"
+    },
+    "project": "demo-rollout",
+    "result": "pass",
+    "service": "simplenode",
+    "stage": "staging",
+    "status": "succeeded"
+  },
+  "id": "1ab9f08b-012e-4d3d-ba38-aa56e17a82cf",
+  "source": "lighthouse-service",
+  "specversion": "1.0",
+  "time": "2021-04-06T10:34:57.501Z",
+  "type": "sh.keptn.event.evaluation.finished",
+  "shkeptncontext": "e4158c2f-c0c3-41cf-b641-1c01b4cbbe9f",
+  "triggeredid": "a7dad41f-c372-4f3c-9225-4d9b14d018a1"
+}
+###

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2" // make sure to use v2 cloudevents here
@@ -41,6 +42,15 @@ func removeFiles(filesToRemove []string) {
  */
 func getKeptnResource(myKeptn *keptnv2.Keptn, resource string, uniquePrefix string) (string, error) {
 	resourceHandler := myKeptn.ResourceHandler
+
+	// local filesystem?
+	if myKeptn.UseLocalFileSystem {
+		if _, err := os.Stat(resource); err == nil {
+			return resource, nil
+		} else {
+			return "", err
+		}
+	}
 
 	// SERVICE-LEVEL: lets try to find it on service level
 	requestedResource, err := resourceHandler.GetServiceResource(myKeptn.Event.GetProject(), myKeptn.Event.GetStage(), myKeptn.Event.GetService(), resource)
@@ -98,7 +108,12 @@ func getKeptnResource(myKeptn *keptnv2.Keptn, resource string, uniquePrefix stri
 }
 
 //
-// replaces $ placeholders with actual values
+// Iterates through all elements in the incomingEvent
+// First,
+// It will replace references in the input string, e.g: ${data.project} will be replaced with the project field
+// Second,
+// The function also returns an array that can be used to pass env variables, e.g: DATA_PROJECT=project
+
 // $TIMESTRING, $TIMEUTCSTRING, $TIMEUTCMS
 // $CONTEXT, $EVENT, $SOURCE
 // $PROJECT, $STAGE, $SERVICE
@@ -108,20 +123,28 @@ func getKeptnResource(myKeptn *keptnv2.Keptn, resource string, uniquePrefix stri
 // $ENV.XXXX    -> will replace that with an env variable called XXXX
 // $SECRET.YYYY -> will replace that with the k8s secret called YYYY
 //
-func replaceKeptnPlaceholders(input string, incomingEvent cloudevents.Event) string {
+func manageKeptnPlaceholders(input string, incomingEvent cloudevents.Event) (string, []string) {
+
 	result := input
 
-	// first we do the regular keptn values
-	myMap := map[string]interface{}{}
-	if err := keptnv2.Decode(incomingEvent, myMap); err != nil {
-		return input
+	// we have three special values that we provide for convenience to better integrate with tools that need a timestamp in UTC and UTC (ms)
+	nano := incomingEvent.Time().UTC().UnixNano()
+	milli := nano / 1000000
+	time := incomingEvent.Time().String()
+	timeutc := incomingEvent.Time().UTC().String()
+	timeutcms := strconv.FormatInt(milli, 10)
+
+	envArray := []string{
+		fmt.Sprintf("TIMESTRING=%s", time),
+		fmt.Sprintf("TIMEUTCSTRING=%s", timeutc),
+		fmt.Sprintf("TIMEUTCMS=%s", timeutcms),
 	}
+	result = strings.Replace(result, "${timestring}", time, -1)
+	result = strings.Replace(result, "${timeutcstring}", timeutc, -1)
+	result = strings.Replace(result, "${timeutcms}", timeutcms, -1)
 
-	input = replacePlaceHolderRecursively(input, "", myMap)
-
-	// now we do all environment variables
-	// TODO: This is mega dangerous, this needs to be adapted when we have proper secret management in Keptn
-	// now we do all environment variables
+	// First, we iterate through all our env-variables
+	// TODO: Passing our own env variables is mega dangerous, this needs to be adapted when we have proper secret management in Keptn
 	for _, env := range os.Environ() {
 		pair := strings.SplitN(env, "=", 2)
 		key := strings.ToLower(pair[0])
@@ -130,15 +153,28 @@ func replaceKeptnPlaceholders(input string, incomingEvent cloudevents.Event) str
 			continue
 		}
 		result = strings.Replace(result, "${env."+key+"}", pair[1], -1)
+
+		// also add the env-variable "as-is" to our list of envVariables!
+		envArray = append(envArray, env)
+
+		if VerboseLogging {
+			log.Printf(env)
+		}
 	}
 
-	// TODO: iterate through k8s secrets!
-	// ToDo: This is also mega dangerous, don't do this
+	// Second, we iterate through all data elements in our incoming event
+	myMap := map[string]interface{}{}
+	if err := keptnv2.Decode(incomingEvent, &myMap); err != nil {
+		log.Printf("Failed to decode incomingEvent: %s", err.Error())
+		return input, envArray
+	}
+	result, envArray = manageKeptnPlaceholdersRecursively(result, envArray, "", myMap)
 
-	return result
+	return result, envArray
 }
 
-func replacePlaceHolderRecursively(input, keyPath string, values map[string]interface{}) string {
+func manageKeptnPlaceholdersRecursively(input string, envArray []string, keyPath string, values map[string]interface{}) (string, []string) {
+
 	for key, value := range values {
 		var newKeyPath string
 		if keyPath != "" {
@@ -147,36 +183,68 @@ func replacePlaceHolderRecursively(input, keyPath string, values map[string]inte
 			newKeyPath = key
 		}
 		newKeyPathPlaceHolder := "${" + newKeyPath + "}"
+
+		// for env-variables we make them UPPER CASE and replace any . with _
+		newKeyPathEnvVariable := strings.ToUpper(strings.ReplaceAll(newKeyPath, ".", "_"))
+
 		switch value.(type) {
 		case string:
-			input = strings.ReplaceAll(input, newKeyPathPlaceHolder, value.(string))
+			// First, replace it in the input string
+			stringValue := value.(string)
+			input = strings.ReplaceAll(input, newKeyPathPlaceHolder, stringValue)
+			if VerboseLogging {
+				log.Printf("%s --> %s", newKeyPathPlaceHolder, stringValue)
+			}
+
+			// Second, add it to the env array
+			envVariableDefinition := fmt.Sprintf("%s=%s", newKeyPathEnvVariable, stringValue)
+			envArray = append(envArray, envVariableDefinition)
+			if VerboseLogging {
+				log.Printf(envVariableDefinition)
+			}
 		case map[string]interface{}:
-			input = replacePlaceHolderRecursively(input, newKeyPath, value.(map[string]interface{}))
+			input, envArray = manageKeptnPlaceholdersRecursively(input, envArray, newKeyPath, value.(map[string]interface{}))
 		case []interface{}:
-			input = replacePlaceHolderArrayRecursively(input, newKeyPath, value.([]interface{}))
+			input, envArray = manageKeptnPlaceholdersArrayRecursively(input, envArray, newKeyPath, value.([]interface{}))
 		}
 	}
-	return input
+	return input, envArray
 }
 
-func replacePlaceHolderArrayRecursively(input, keyPath string, values []interface{}) string {
+func manageKeptnPlaceholdersArrayRecursively(input string, envArray []string, keyPath string, values []interface{}) (string, []string) {
 	if keyPath == "" {
-		return input
+		return input, envArray
 	}
 	for index, value := range values {
 		var newKeyPath string
 		newKeyPath = fmt.Sprintf("%s[%d]", keyPath, index)
 		newKeyPathPlaceHolder := "${" + newKeyPath + "}"
+
+		// for env-variables we make them UPPER CASE and replace any . with _
+		newKeyPathEnvVariable := strings.ToUpper(fmt.Sprintf("%s_%d", strings.ReplaceAll(keyPath, ".", "_"), index))
+
 		switch value.(type) {
 		case string:
-			input = strings.ReplaceAll(input, newKeyPathPlaceHolder, value.(string))
+			// First, replace it in the input string
+			stringValue := value.(string)
+			input = strings.ReplaceAll(input, newKeyPathPlaceHolder, stringValue)
+			if VerboseLogging {
+				log.Printf("%s --> %s", newKeyPathPlaceHolder, stringValue)
+			}
+
+			// Second, add it to the env array
+			envVariableDefinition := fmt.Sprintf("%s=%s", newKeyPathEnvVariable, stringValue)
+			envArray = append(envArray, envVariableDefinition)
+			if VerboseLogging {
+				log.Printf(envVariableDefinition)
+			}
 		case map[string]interface{}:
-			input = replacePlaceHolderRecursively(input, newKeyPath, value.(map[string]interface{}))
+			input, envArray = manageKeptnPlaceholdersRecursively(input, envArray, newKeyPath, value.(map[string]interface{}))
 		case []interface{}:
-			input = replacePlaceHolderArrayRecursively(input, newKeyPath, value.([]interface{}))
+			input, envArray = manageKeptnPlaceholdersArrayRecursively(input, envArray, newKeyPath, value.([]interface{}))
 		}
 	}
-	return input
+	return input, envArray
 }
 
 func _nextCleanLine(lines []string, lineIx int, trim bool) (int, string) {
@@ -231,7 +299,7 @@ func parseHttpRequestFromString(rawContent string, incomingEvent cloudevents.Eve
 	var returnRequest genericHttpRequest
 
 	// lets first replace all Keptn related placeholders
-	rawContent = replaceKeptnPlaceholders(rawContent, incomingEvent)
+	rawContent, _ = manageKeptnPlaceholders(rawContent, incomingEvent)
 
 	// lets get each line
 	lines := strings.Split(rawContent, "\n")
@@ -314,6 +382,16 @@ func executeGenericHttpRequest(request genericHttpRequest) (int, string, error) 
 }
 
 //
+// Executes the commands by adding data from the incomingEvent as Env-Variables
+//
+func executeCommandWithKeptnContext(command string, args []string, incomingEvent cloudevents.Event, directory *string) (string, error) {
+	// lets first replace all Keptn related placeholders
+	_, envVars := manageKeptnPlaceholders("", incomingEvent)
+
+	return executeCommand(command, args, envVars, directory)
+}
+
+//
 // Executes a command, e.g: ls -l; ./yourscript.sh
 // Also sets the enviornment variables passed
 //
@@ -323,14 +401,30 @@ func executeCommand(command string, args []string, envs []string, directory *str
 		cmd.Dir = *directory
 	}
 
+	if VerboseLogging {
+		log.Printf("About to execute: %s with %s", command, args)
+
+		for _, envVariable := range envs {
+			log.Printf(envVariable)
+		}
+	}
+
 	// pass environment variables
 	cmd.Env = envs
 
 	// Execute Command
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		err = fmt.Errorf("Error executing command %s %s: %s\n%s", command, strings.Join(args, " "), err.Error(), string(out))
+		errMessage := fmt.Sprintf("Error executing command %s %s: %s\n%s", command, strings.Join(args, " "), err.Error(), string(out))
+		log.Printf(errMessage)
+		err = fmt.Errorf(errMessage)
+
 		return "", err
+	} else {
+		if VerboseLogging {
+			log.Printf("Script executed successful")
+			log.Printf("%s", string(out))
+		}
 	}
 
 	return string(out), nil
