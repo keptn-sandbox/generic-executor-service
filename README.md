@@ -15,7 +15,7 @@ This implements a generic-executor-service for Keptn.
 |       0.6.1      | grabnerandi/generic-executor-service:latest |
 |       0.7.x      | grabnerandi/generic-executor-service:0.2 |
 |       0.7.3      | keptnsandbox/generic-executor-service:0.3 |
-|       0.8.x      | grabnerandi/generic-executor-service:0.8.0 |
+|       0.8.x      | keptnsandbox/generic-executor-service:0.8.0 |
 
 ## Installation
 
