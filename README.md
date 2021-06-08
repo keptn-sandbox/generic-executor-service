@@ -26,7 +26,7 @@ The *generic-executor-service* can be installed as a part of [Keptn's uniform](h
 To deploy the current version of the *generic-executor-service* in your Keptn Kubernetes cluster, apply the [`deploy/service.yaml`](deploy/service.yaml) file:
 
 ```console
-kubectl apply -f deploy/service.yaml
+kubectl apply -n keptn -f deploy/service.yaml
 ```
 
 This should install the `generic-executor-service` together with a Keptn `distributor` into the `keptn` namespace, which you can verify using
@@ -59,17 +59,17 @@ The *generic-executor-service* by default handles all Keptn events and then sear
 
 Here is a sample folder structure in my Git repo for a specific service and stage:
 ```
-[STAGE]/MYSERVICE/genericexecutor
+[STAGE]/MYSERVICE/generice-xecutor
 -- all.events.sh              <-- executed for all events for this service
 -- configuration.change.py    <-- executed for configuration.change
 -- configuration.change.http  <-- executed for configuration.change
 
-[STAGE]/genericexecutor
+[STAGE]/generic-executor
 -- all.events.py              <-- executed for all events for all services unless file exists on service level
 -- configuration.change.sh    <-- executed for configuration.change for all services unless file exists on service level
 -- configuration.change.http  <-- executed for configuration.change for all services unless file exists on service level
 
-[MASTER]/genericexecutor
+[MASTER]/generic-executor
 -- all.events.http            <-- executed for all events unless file exists on stage service level
 -- configuration.change.sh    <-- executed for configuration.change for all services unless file exists on stage or service level
 -- configuration.change.py    <-- executed for configuration.change for all services unless file exists on stage or service level
@@ -89,7 +89,14 @@ Here is the list of all event prefixes that you can use for your script names:
 -- action.triggered.ACTIONNAME*
 ```
 
-This gives you full flexiblity to provide a bash, python or http script for each event or specify a bash and http script that shoudl be executed for all events.
+This gives you full flexiblity to provide a bash, python or http script for each event or specify a bash and http script that should be executed for all events.
+
+Adding files into this structure could also be done with the `keptn` cli e.g. through:
+
+```console
+keptn add-resource --project=[PROJECT] --stage=[STAGE] --service=[SERVICE] --resource=local-folder/all.events.sh --resourceUri=generic-executor/all.events.sh
+keptn add-resource --project=[PROJECT] --all-stages --service=[SERVICE] --resource=local-folder/all.events.http --resourceUri=generic-executor/all.events.http
+```
 
 **ATTENTION:** As mentioned above `action.triggered.*` is treated specially. The *generic-executor-service* only executes the first matching script starting but not all that match, e.g: if it finds `action.triggered.actionname.sh` it WONT execute a script with the name `all.events.sh`. More information on this behavior can be found in the section on auto-remediation below!
 
@@ -201,7 +208,7 @@ Enjoy the fun!
 ## Usage for Remediation Actions
 
 The *generic-executor-service* provides an easy way to define your own **Auto-Remediation Actions** that Keptn can trigger as a part of an Remediation Workflow.
-In order for you to have your script exectued for a particular remediation action simply give the script the following name: action.triggered.<ACTIONNAME>.xx.
+In order for you to have your script executed for a particular remediation action simply give the script the following name: action.triggered.<ACTIONNAME>.xx.
 Actionname references the name of the action in your remediation.yaml. So - the following remediation.yaml defines the action *poweroutageaction*:
 ```yaml
 apiVersion: spec.keptn.sh/0.1.4
@@ -228,7 +235,7 @@ Besides the environment variables described above this script also gets env-vari
 For a full example check out the script *action.triggered.myaction.py* which you can find in the files subfolder!
 
 ### Return Result and Status
-The *generic-executor-servcie* will send a `sh.keptn.event.action.finished` once the script finished execution. That event includes two fields telling Keptn more about the result (pass or fail) and status (optional more detailed description of the result) of that execution.
+The *generic-executor-service* will send a `sh.keptn.event.action.finished` once the script finished execution. That event includes two fields telling Keptn more about the result (pass or fail) and status (optional more detailed description of the result) of that execution.
 
 The *generic-executor-service* will set `result` to `pass` if the script executed with error code 0 or if an HTTP WebHook returned 2xx (200-299). If not - it will return `fail`
 
