@@ -53,6 +53,8 @@ spec:
     metadata:
       labels:
         run: generic-executor-service
+        app.kubernetes.io/name: generic-executor-service
+        app.kubernetes.io/version: 0.8.0
     spec:
       serviceAccountName: generic-executor-service
       containers:
@@ -103,7 +105,7 @@ spec:
                   key: KEPTN_BRIDGE_URL
                   optional: true
         - name: distributor
-          image: keptn/distributor:0.8.0
+          image: keptn/distributor:0.8.4
           ports:
             - containerPort: 8080
           resources:
@@ -114,6 +116,31 @@ spec:
               memory: "32Mi"
               cpu: "250m"
           env:
+            - name: VERSION
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: 'metadata.labels[''app.kubernetes.io/version'']'
+            - name: K8S_DEPLOYMENT_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: 'metadata.labels[''app.kubernetes.io/name'']'
+            - name: K8S_POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: K8S_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName            
             - name: PUBSUB_URL
               value: 'nats://keptn-nats-cluster'
             - name: PUBSUB_TOPIC
