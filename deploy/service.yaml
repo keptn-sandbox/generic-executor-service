@@ -54,12 +54,12 @@ spec:
       labels:
         run: generic-executor-service
         app.kubernetes.io/name: generic-executor-service
-        app.kubernetes.io/version: 0.8.0
+        app.kubernetes.io/version: 0.8.4
     spec:
       serviceAccountName: generic-executor-service
       containers:
         - name: generic-executor-service
-          image: keptnsandbox/generic-executor-service:0.8.0
+          image: keptnsandbox/generic-executor-service:0.8.4
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
