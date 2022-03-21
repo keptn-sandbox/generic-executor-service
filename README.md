@@ -1,12 +1,21 @@
 # Generic Executor Service for Keptn
 
-This is a Sandbox Keptn Service that enables generic execution of bash files, Python3 and HTTP requests for individual Keptn Events 
+
+This is a Sandbox Keptn Service that enables generic execution of bash files, Python3 and HTTP requests for individual Keptn Events
 
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/keptn-sandbox/generic-executor-service)
 [![Build Status](https://travis-ci.org/keptn-sandbox/generic-executor-service.svg?branch=master)](https://travis-ci.org/keptn-sandbox/generic-executor-service)
 [![Go Report Card](https://goreportcard.com/badge/github.com/keptn-sandbox/generic-executor-service)](https://goreportcard.com/report/github.com/keptn-sandbox/generic-executor-service)
 
 This implements a generic-executor-service for Keptn.
+
+## :warning: This service is currently not maintained and will be archived
+
+Instead of using generic-executor-service, we recommend to 
+
+* make use of [Keptn job-executor-service](https://github.com/keptn-contrib/job-executor-service/), 
+* look for an existing [Keptn integration](https://keptn.sh/docs/integrations/),
+* or for simple webhook based integrations, use [Keptn's built-in webhook-service](https://keptn.sh/docs/0.13.x/integrations/webhooks/).
 
 ## Compatibility Matrix
 
