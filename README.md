@@ -13,7 +13,7 @@ This implements a generic-executor-service for Keptn.
 
 Instead of using generic-executor-service, we recommend to 
 
-* make use of  [Keptn job-executor-service](https://github.com/keptn-contrib/job-executor-service/), 
+* make use of [Keptn job-executor-service](https://github.com/keptn-contrib/job-executor-service/), 
 * look for an existing [Keptn integration](https://keptn.sh/docs/integrations/),
 * or for simple webhook based integrations, use [Keptn's built-in webhook-service](https://keptn.sh/docs/0.13.x/integrations/webhooks/).
 
