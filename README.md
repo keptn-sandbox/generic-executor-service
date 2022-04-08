@@ -13,7 +13,7 @@ This implements a generic-executor-service for Keptn.
 
 Instead of using generic-executor-service, we recommend to 
 
-* make use of [Keptn job-executor-service](https://github.com/keptn-contrib/job-executor-service/), 
+* make use of [Keptn job-executor-service](https://github.com/keptn-contrib/job-executor-service/) - see [Migration Guide](https://github.com/keptn-contrib/job-executor-service/blob/main/docs/MIGRATION-GUIDE-GENERIC-EXECUTOR-SERVICE.md) for more details, 
 * look for an existing [Keptn integration](https://keptn.sh/docs/integrations/),
 * or for simple webhook based integrations, use [Keptn's built-in webhook-service](https://keptn.sh/docs/0.13.x/integrations/webhooks/).
 
@@ -26,6 +26,8 @@ Instead of using generic-executor-service, we recommend to
 |       0.7.3      | keptnsandbox/generic-executor-service:0.3 |
 |       0.8.x      | keptnsandbox/generic-executor-service:0.8.0 |
 |   0.9.x,0.10.x   | keptnsandbox/generic-executor-service:0.8.4 |
+
+**While this integration might work with newer Keptn versions, it is not compatible with Keptn versions 0.14.x and newer.**
 
 ## Installation
 
